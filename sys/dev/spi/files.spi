@@ -1,0 +1,37 @@
+#	$NetBSD: files.spi,v 1.2 2006/10/07 07:21:13 gdamore Exp $
+
+define	spibus { }
+
+device	spi { slave, [intr = -1] }
+attach	spi at spibus
+file	dev/spi/spi.c			spi | spibus
+
+#
+# SPI client devices
+#
+
+# Common SPI flash support
+define	spiflashbus { }
+device	spiflash: disk
+attach	spiflash at spiflashbus
+file	dev/spi/spiflash.c		spiflash | spiflashbus
+
+# STMicro M25P SPI flash
+device	m25p: spiflashbus
+attach	m25p at spi
+file	dev/spi/m25p.c			m25p
+
+# TI TMP121 digital temperature sensor
+device	tmp121temp: sysmon_envsys
+attach	tmp121temp at spi
+file	dev/spi/tmp121.c		tmp121temp
+
+# TI WiLink wireless network interface
+device	wilink: ifnet, arp, wlan
+attach	wilink at spi
+file	dev/spi/if_wilink.c		wilink
+
+# TSC2005 touchscreen
+device	tsc2005ts: wsmousedev
+attach	tsc2005ts at spi
+file	dev/spi/tsc2005.c		tsc2005ts
