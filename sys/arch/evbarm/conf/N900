@@ -234,20 +234,22 @@ n900lckbtn0	at gpio3 offset 17 mask 0x1 #intr 209
 omapscm0 	at obio0 addr 0x48002000 size 0x1000
 
 # I2C Controller
-omapiic0	at obio0 addr 0x48070000 size 0x80
-omapiic1	at obio0 addr 0x48072000 size 0x80
-omapiic2	at obio0 addr 0x48060000 size 0x80
+omapiic0	at obio0 addr 0x48070000 size 0x80 #intr 56
+omapiic1	at obio0 addr 0x48072000 size 0x80 #intr 57
+omapiic2	at obio0 addr 0x48060000 size 0x80 #intr 61
 iic*		at omapiic?
 
 # I2C devices
 # Power Management and System Companion Device
-tps65950pm0	at iic0 addr 0x48 #intr 56? 7? 57?
+tps65950pm0	at iic0 addr 0x48 intr 7
 tps65950pm1	at iic0 addr 0x49
 tps65950pm2	at iic0 addr 0x4a
 tps65950pm3	at iic0 addr 0x4b
 
+gpio*		at tps65950pm0
+
 # Integrated keyboard
-wskbd* at tps65950pm0 mux 1
+wskbd*		at tps65950pm0 mux 1
 
 # Accelerometer
 stmemsis0	at iic2 addr 0x1d intr 277

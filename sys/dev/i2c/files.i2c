@@ -173,7 +173,7 @@ attach	ibmhawk at iic
 file	dev/i2c/ibmhawk.c		ibmhawk
 
 # TI TPS65950 OMAP Power Management and System Companion Device
-device	tps65950pm: sysmon_wdog, wskbddev
+device	tps65950pm: gpiobus, sysmon_wdog, wskbddev
 attach	tps65950pm at iic
 file	dev/i2c/tps65950.c		tps65950pm
 
