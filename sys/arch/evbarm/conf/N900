@@ -250,7 +250,7 @@ tps65950pm3	at iic0 addr 0x4b
 wskbd* at tps65950pm0 mux 1
 
 # Accelerometer
-#stmemsis0	at iic2 addr 0x1d intr 277
+stmemsis0	at iic2 addr 0x1d intr 277
 
 # SPI devices
 omapspi0	at obio0 addr 0x48098000 size 0x1000 intr 65
@@ -262,7 +262,6 @@ spi*		at omapspi?
 
 # Touchscreen
 tsc2005ts0	at spi0 slave 0 intr 196
-#tsc2005ts0	at spi0 slave 0 #intr 196
 wsmouse*	at tsc2005ts? mux 0
 
 # Wireless interface
