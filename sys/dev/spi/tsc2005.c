@@ -39,11 +39,22 @@ __KERNEL_RCSID(0, "$NetBSD$");
 #include <sys/workqueue.h>
 
 #include <dev/spi/spivar.h>
-
+#include <dev/sysmon/sysmonvar.h>
 #include <dev/wscons/wsconsio.h>
 #include <dev/wscons/wsmousevar.h>
 
 #include <dev/spi/tsc2005reg.h>
+
+enum tsc2005_sensors {
+	TSC2005_SENSOR_TEMP1 = 0,
+	TSC2005_SENSOR_TEMP2
+};
+#define TSC2005_SENSOR_LAST	TSC2005_SENSOR_TEMP2
+#define TSC2005_SENSOR_COUNT	(TSC2005_SENSOR_LAST + 1)
+
+static const char const * tsc2005_sensors_names[TSC2005_SENSOR_COUNT] = {
+	"temp1", "temp2"
+};
 
 /* variables */
 struct tsc2005_softc {
@@ -58,6 +69,10 @@ struct tsc2005_softc {
 
 	device_t		sc_wsmousedev;
 	bool			sc_wsenabled;
+
+	struct sysmon_envsys	*sc_sme;
+	bool			sc_state;
+	envsys_data_t		sc_sensor[TSC2005_SENSOR_COUNT];
 };
 
 static int	tsc2005_match(device_t, cfdata_t, void *);
@@ -103,6 +118,7 @@ tsc2005_attach(device_t parent, device_t self, void *aux)
 	struct tsc2005_softc *sc = device_private(self);
 	struct spi_attach_args *sa = aux;
 	struct wsmousedev_attach_args a;
+	int i;
 	int error;
 
 	sc->sc_dev = self;
@@ -134,10 +150,45 @@ tsc2005_attach(device_t parent, device_t self, void *aux)
 	}
 	sc->sc_queued = false;
 
+	/* attach wsmouse */
 	a.accessops = &tsc2005_accessops;
 	a.accesscookie = sc;
 	sc->sc_wsmousedev = config_found(self, &a, wsmousedevprint);
 	sc->sc_wsenabled = false;
+
+	/* initialize the sensors */
+	sc->sc_sme = sysmon_envsys_create();
+	for (i = 0; i < TSC2005_SENSOR_COUNT; i++) {
+		sc->sc_sensor[i].units = ENVSYS_INTEGER;
+		strlcpy(sc->sc_sensor[i].desc, tsc2005_sensors_names[i],
+				sizeof(sc->sc_sensor[i].desc));
+		sc->sc_sensor[i].state = ENVSYS_SVALID;
+		sc->sc_sensor[i].flags = ENVSYS_FHAS_ENTROPY;
+		if (sysmon_envsys_sensor_attach(sc->sc_sme,
+					&sc->sc_sensor[i])) {
+			aprint_error_dev(sc->sc_dev,
+					"couldn't attach sensor %s\n",
+					sc->sc_sensor[i].desc);
+			sysmon_envsys_destroy(sc->sc_sme);
+			sc->sc_sme = NULL;
+			break;
+		}
+	}
+
+	/* register the sensors */
+	if (sc->sc_sme) {
+		sc->sc_sme->sme_name = device_xname(self);
+		sc->sc_sme->sme_flags = SME_DISABLE_REFRESH;
+
+		error = sysmon_envsys_register(sc->sc_sme);
+		if (error) {
+			aprint_error_dev(self,
+					"unable to register with sysmon (%d)\n",
+					error);
+			sysmon_envsys_destroy(sc->sc_sme);
+			sc->sc_sme = NULL;
+		}
+	}
 
 	if (!pmf_device_register(sc->sc_dev, NULL, NULL)) {
 		aprint_error_dev(sc->sc_dev,
@@ -149,6 +200,10 @@ static int
 tsc2005_detach(device_t self, int flags)
 {
 	struct tsc2005_softc *sc = device_private(self);
+
+	if (sc->sc_sme) {
+		sysmon_envsys_unregister(sc->sc_sme);
+	}
 
 	if (sc->sc_workq) {
 		workqueue_destroy(sc->sc_workq);
