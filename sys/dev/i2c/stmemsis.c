@@ -200,6 +200,7 @@ stmemsis_attach(device_t parent, device_t self, void *aux)
 	struct i2c_attach_args *ia = aux;
 	uint8_t u8;
 	int i;
+	int error;
 
 	sc->sc_dev = self;
 	sc->sc_i2c = ia->ia_tag;
@@ -272,20 +273,28 @@ stmemsis_attach(device_t parent, device_t self, void *aux)
 
 		if (sysmon_envsys_sensor_attach(sc->sc_sme,
 					&sc->sc_sensor[i])) {
+			aprint_error_dev(sc->sc_dev,
+					"couldn't attach sensor %s\n",
+					sc->sc_sensor[i].desc);
 			sysmon_envsys_destroy(sc->sc_sme);
+			sc->sc_sme = NULL;
 			break;
 		}
 	}
 
 	/* register with sysmon_envsys(9) */
-	sc->sc_sme->sme_name = device_xname(self);
-	sc->sc_sme->sme_flags = SME_DISABLE_REFRESH;
+	if (sc->sc_sme) {
+		sc->sc_sme->sme_name = device_xname(self);
+		sc->sc_sme->sme_flags = SME_DISABLE_REFRESH;
 
-	if ((i = sysmon_envsys_register(sc->sc_sme))) {
-		aprint_error_dev(self,
-				"unable to register with sysmon (%d)\n", i);
-		sysmon_envsys_destroy(sc->sc_sme);
-		return;
+		error = sysmon_envsys_register(sc->sc_sme);
+		if (error) {
+			aprint_error_dev(self,
+					"unable to register with sysmon (%d)\n",
+					error);
+			sysmon_envsys_destroy(sc->sc_sme);
+			sc->sc_sme = NULL;
+		}
 	}
 
 	if (!pmf_device_register(sc->sc_dev, stmemsis_suspend,
@@ -309,8 +318,9 @@ stmemsis_detach(device_t self, int flags)
 		intr_disestablish(sc->sc_intr2);
 	}
 
-	if (sc->sc_sme)
+	if (sc->sc_sme) {
 		sysmon_envsys_unregister(sc->sc_sme);
+	}
 
 	pmf_device_deregister(self);
 
