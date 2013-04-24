@@ -227,9 +227,11 @@ tsc2005_work(struct work *wk, void *arg)
 	tsc2005_read_reg(sc, TSC2005_REG_Y, &y);
 	tsc2005_read_reg(sc, TSC2005_REG_Z1, &z);
 
-	s = spltty();
-	wsmouse_input(sc->sc_wsmousedev, buttons, x, y, z, 0, flags);
-	splx(s);
+	if (sc->sc_wsmousedev != NULL) {
+		s = spltty();
+		wsmouse_input(sc->sc_wsmousedev, buttons, x, y, z, 0, flags);
+		splx(s);
+	}
 #endif
 
 	sc->sc_queued = false;
