@@ -44,6 +44,11 @@ __KERNEL_RCSID(0, "$NetBSD: tps65950.c,v 1.3 2012/12/31 21:45:36 jmcneill Exp $"
 
 #include <dev/i2c/i2cvar.h>
 
+#if NGPIO > 0
+#include <sys/gpio.h>
+#include <dev/gpio/gpiovar.h>
+#endif /* NGPIO > 0 */
+
 #if defined(OMAP_3430)
 #include <dev/wscons/wsconsio.h>
 #include <dev/wscons/wskbdvar.h>
@@ -66,8 +71,21 @@ __KERNEL_RCSID(0, "$NetBSD: tps65950.c,v 1.3 2012/12/31 21:45:36 jmcneill Exp $"
 #define TPS65950_ADDR_ID4		0x4b	/* GP */
 #define TPS65950_ADDR_ID5		0x12	/* SmartReflex */
 
-/* ID1 */
-#define TPS65950_KBD_BASE		0xd2
+/* PIH */
+#define TPS65950_PIH_BASE		0x80
+#define TPS65950_PIH_REG_ISR_P1		(TPS65950_PIH_BASE + 0x01)
+#define TPS65950_PIH_REG_ISR_P2		(TPS65950_PIH_BASE + 0x02)
+#define TPS65950_PIH_REG_SIR		(TPS65950_PIH_BASE + 0x03)
+
+/* BCI */
+#define TPS65950_BCI_BASE		0xb9
+
+/* GPIO */
+#define TPS65950_GPIO_BASE		0x98
+
+/* ID1: KEYPAD */
+#define TPS65950_KEYPAD_BASE		0xd2
+#define TPS65950_KEYPAD_REG_IMR1	(TPS65950_KEYPAD_BASE + 0x12)
 
 /* ID2 */
 #define TPS65950_ID2_IDCODE_7_0		0x85
@@ -106,11 +124,22 @@ struct tps65950_softc {
 	i2c_addr_t		sc_addr;
 
 	struct sysctllog	*sc_sysctllog;
-#if defined(OMAP_3430)
+
+	/* bci */
 	void			*sc_intr;
+
+#if NGPIO > 0
+	/* gpio */
+	struct gpio_chipset_tag	sc_gpio;
+	gpio_pin_t		sc_gpio_pins[18];
+#endif /* NGPIO > 0 */
+
+#if defined(OMAP_3430)
+	/* keypad */
 	device_t		sc_wskbddev;
 	struct wskbd_mapdata	*sc_keymapdata;
 #endif
+
 	struct sysmon_wdog	sc_smw;
 	struct todr_chip_handle	sc_todr;
 };
@@ -122,6 +151,16 @@ static int	tps65950_read_1(struct tps65950_softc *, uint8_t, uint8_t *);
 static int	tps65950_write_1(struct tps65950_softc *, uint8_t, uint8_t);
 
 static void	tps65950_sysctl_attach(struct tps65950_softc *);
+
+static void	tps65950_bci_attach(struct tps65950_softc *, int);
+
+#if NGPIO > 0
+static void	tps65950_gpio_attach(struct tps65950_softc *);
+
+static int	tps65950_gpio_pin_read(void *, int);
+static void	tps65950_gpio_pin_write(void *, int, int);
+static void	tps65950_gpio_pin_ctl(void *, int, int);
+#endif /* NGPIO > 0 */
 
 #if defined(OMAP_3430)
 static int	tps65950_intr(void *);
@@ -165,7 +204,7 @@ static struct wskbd_consops tps65950_kbd_consops = {
 	NULL
 };
 
-static void	tps65950_kbd_attach(struct tps65950_softc *, int);
+static void	tps65950_kbd_attach(struct tps65950_softc *);
 #endif
 
 static void	tps65950_rtc_attach(struct tps65950_softc *);
@@ -213,10 +252,20 @@ tps65950_attach(device_t parent, device_t self, void *aux)
 
 	switch (sc->sc_addr) {
 	case TPS65950_ADDR_ID1:
+		aprint_normal(": BCI");
+		tps65950_bci_attach(sc, ia->ia_intr);
+
+#if NGPIO > 0
+		aprint_normal(", GPIO");
+		tps65950_gpio_attach(sc);
+#endif /* NGPIO > 0 */
+
 #if defined(OMAP_3430)
-		aprint_normal(": KEYPAD\n");
-		tps65950_kbd_attach(sc, ia->ia_intr);
+		aprint_normal(", KEYPAD");
+		tps65950_kbd_attach(sc);
 #endif
+
+		aprint_normal("\n");
 		break;
 	case TPS65950_ADDR_ID2:
 		memset(buf, 0, sizeof(buf));
@@ -364,18 +413,90 @@ tps65950_sysctl_attach(struct tps65950_softc *sc)
 		return;
 }
 
+static void
+tps65950_bci_attach(struct tps65950_softc *sc, int intr)
+{
+	aprint_normal_dev(sc->sc_dev, "%s(%d)\n", __func__, intr);
+	sc->sc_intr = intr_establish(intr, IPL_VM, IST_EDGE_FALLING,
+			tps65950_intr, sc);
+	if (sc->sc_intr == NULL) {
+		aprint_error_dev(sc->sc_dev, "couldn't establish interrupt\n");
+	}
+}
+
+#if NGPIO > 0
+static void
+tps65950_gpio_attach(struct tps65950_softc *sc)
+{
+	struct gpio_chipset_tag * const gp = &sc->sc_gpio;
+	struct gpiobus_attach_args gba;
+
+	gp->gp_cookie = sc;
+	gp->gp_pin_read = tps65950_gpio_pin_read;
+	gp->gp_pin_write = tps65950_gpio_pin_write;
+	gp->gp_pin_ctl = tps65950_gpio_pin_ctl;
+
+	gba.gba_gc = gp;
+	gba.gba_pins = sc->sc_gpio_pins;
+	gba.gba_npins = __arraycount(sc->sc_gpio_pins);
+
+	/* FIXME may be missing some code here */
+
+	config_found_ia(sc->sc_dev, "gpiobus", &gba, gpiobus_print);
+}
+
+static int
+tps65950_gpio_pin_read(void *v, int pin)
+{
+	/* FIXME implement */
+	return ENOSYS;
+}
+
+static void
+tps65950_gpio_pin_write(void *v, int pin, int value)
+{
+	/* FIXME implement */
+}
+
+static void
+tps65950_gpio_pin_ctl(void *v, int pin, int flags)
+{
+	/* FIXME implement */
+}
+#endif /* NGPIO > 0 */
+
 #if defined(OMAP_3430)
 static int
 tps65950_intr(void *v)
 {
+	struct tps65950_softc *sc = v;
+	uint8_t u8;
+
 	/* FIXME implement */
+	aprint_normal_dev(sc->sc_dev, "%s()\n", __func__);
+
+	iic_acquire_bus(sc->sc_i2c, 0);
+
+	/* acknowledge the interrupt */
+	tps65950_read_1(sc, TPS65950_PIH_REG_ISR_P1, &u8);
+	aprint_normal_dev(sc->sc_dev, "%s() u8=%u\n", __func__, u8);
+	tps65950_write_1(sc, TPS65950_PIH_REG_ISR_P1, u8);
+
+	iic_release_bus(sc->sc_i2c, 0);
 	return 1;
 }
 
 static int
 tps65950_kbd_enable(void *v, int on)
 {
-	/* FIXME implement */
+	struct tps65950_softc *sc = v;
+
+	iic_acquire_bus(sc->sc_i2c, 0);
+
+	/* FIXME really implement */
+	tps65950_write_1(sc, TPS65950_KEYPAD_REG_IMR1, 0);
+
+	iic_release_bus(sc->sc_i2c, 0);
 	return 0;
 }
 
@@ -412,16 +533,9 @@ tps65950_kbd_cnpollc(void *v, int on)
 }
 
 static void
-tps65950_kbd_attach(struct tps65950_softc *sc, int intr)
+tps65950_kbd_attach(struct tps65950_softc *sc)
 {
 	struct wskbddev_attach_args a;
-
-	sc->sc_intr = intr_establish(intr, IPL_TTY, IST_EDGE_FALLING,
-			tps65950_intr, sc);
-	if (sc->sc_intr == NULL) {
-		aprint_error_dev(sc->sc_dev, "couldn't establish interrupt\n");
-		return;
-	}
 
 	wskbd_cnattach(&tps65950_kbd_consops, sc, sc->sc_keymapdata);
 
