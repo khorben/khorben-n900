@@ -818,7 +818,7 @@ tps65950_gpio_pin_ctl(void *v, int pin, int flags)
 	switch (flags & (GPIO_PIN_INPUT | GPIO_PIN_OUTPUT)) {
 		case GPIO_PIN_INPUT:	new &= ~(1 << bit); break;
 		case GPIO_PIN_OUTPUT:	new |= (1 << bit); break;
-		default:		return;
+		default:		break;
 	}
 	if (new != val)
 		tps65950_write_1(sc, reg, new);
