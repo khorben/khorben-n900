@@ -361,11 +361,6 @@ tps65950_attach(device_t parent, device_t self, void *aux)
 		aprint_normal(": BCI");
 		tps65950_bci_attach(sc, ia->ia_intr);
 
-#if NGPIO > 0
-		aprint_normal(", GPIO");
-		tps65950_gpio_attach(sc, ia->ia_intrbase);
-#endif /* NGPIO > 0 */
-
 #if defined(OMAP_3430)
 		aprint_normal(", KEYPAD");
 		tps65950_kbd_attach(sc);
@@ -385,7 +380,14 @@ tps65950_attach(device_t parent, device_t self, void *aux)
 		iic_release_bus(sc->sc_i2c, 0);
 		idcode = (buf[0] << 0) | (buf[1] << 8) |
 			 (buf[2] << 16) | (buf[3] << 24);
-		aprint_normal(": IDCODE %08X\n", idcode);
+		aprint_normal(": IDCODE %08X", idcode);
+
+#if NGPIO > 0
+		aprint_normal(", GPIO");
+		tps65950_gpio_attach(sc, ia->ia_intrbase);
+#endif /* NGPIO > 0 */
+
+		aprint_normal("\n");
 		break;
 	case TPS65950_ADDR_ID3:
 		aprint_normal(": LED\n");
@@ -550,14 +552,8 @@ tps65950_intr(void *v)
 static void
 tps65950_bci_attach(struct tps65950_softc *sc, int intr)
 {
-	aprint_normal_dev(sc->sc_dev, "%s(%d)\n", __func__, intr);
-#if 0
 	sc->sc_intr = intr_establish(intr, IPL_VM, IST_EDGE_FALLING,
 			tps65950_intr, sc);
-#else /* XXX in case that's what prevents the kernel from booting */
-	sc->sc_intr = intr_establish(intr, IPL_VM, IST_EDGE_RISING,
-			tps65950_intr, sc);
-#endif
 	if (sc->sc_intr == NULL) {
 		aprint_error_dev(sc->sc_dev, "couldn't establish interrupt\n");
 	}
@@ -589,6 +585,10 @@ tps65950_gpio_attach(struct tps65950_softc *sc, int intrbase)
 				intrbase, intrbase + 17);
 		/* FIXME may not be enough to map the interrupts */
 	}
+
+#if 1
+	return;
+#endif
 
 	gp->gp_cookie = sc;
 	gp->gp_pin_read = tps65950_gpio_pin_read;
@@ -778,6 +778,10 @@ tps65950_kbd_attach(struct tps65950_softc *sc)
 	tps65950_write_1(sc, TPS65950_KEYPAD_REG_SIH_CTRL, u8);
 
 	iic_release_bus(sc->sc_i2c, 0);
+
+#if 1
+	return;
+#endif
 
 	wskbd_cnattach(&tps65950_kbd_consops, sc, sc->sc_keymapdata);
 
