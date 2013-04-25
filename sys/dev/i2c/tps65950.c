@@ -238,7 +238,10 @@ struct tps65950_softc {
 #if defined(OMAP_3430)
 	/* keypad */
 	device_t		sc_wskbddev;
+#if 0
 	int			sc_spl;
+#endif
+	uint8_t			sc_keycodes[8];
 #endif
 
 	struct sysmon_wdog	sc_smw;
@@ -317,9 +320,9 @@ static const keysym_t n900_keydesc_us[] = {
 	KC(17),			KS_period,
 	KC(18),			KS_Up,
 	KC(19),			KS_Return,
-	KC(20),			KS_z,
-	KC(21),			KS_x,
-	KC(22),			KS_c,
+	KC(21),			KS_z,
+	KC(22),			KS_x,
+	KC(23),			KS_c,
 	KC(23),			KS_f9,
 	KC(24),			KS_r,
 	KC(25),			KS_v,
@@ -1008,6 +1011,7 @@ tps65950_kbd_cngetc(void *v, u_int *type, int *data)
 	uint8_t u8;
 	uint8_t code[8];
 	int i;
+	int j;
 
 	iic_acquire_bus(sc->sc_i2c, 0);
 
@@ -1019,23 +1023,33 @@ tps65950_kbd_cngetc(void *v, u_int *type, int *data)
 		delay(1000);
 	}
 
-	/* read the keycode */
+	/* read the keycodes pressed */
 	for (i = 0; i < sizeof(code); i++) {
 		tps65950_read_1(sc, TPS65950_KEYPAD_REG_FULL_CODE_7_0 + i,
-				&code[i]); /* XXX */
-		if (code[i] == 0)
-			continue;
-		aprint_normal_dev(sc->sc_dev, "%s() 0x%04x pressed\n",
-				__func__, code[i] * i);
-		*type = WSCONS_EVENT_KEY_DOWN;
-		*data = code[i] * i;
-		break;
+				&code[i]);
 	}
 
 	/* acknowledge the interrupt */
 	tps65950_write_1(sc, TPS65950_KEYPAD_REG_ISR1, 0xff);
 
 	iic_release_bus(sc->sc_i2c, 0);
+
+	/* compare with the last read */
+	for (i = 0; i < sizeof(sc->sc_keycodes); i++) {
+		if (sc->sc_keycodes[i] == code[i])
+			continue;
+		for (j = 0; j < 8; j++) {
+			if ((sc->sc_keycodes[i] & (1 << j))
+					== (code[i] & (1 << j)))
+				continue;
+			*type = (code[i] & (1 << j)) ? WSCONS_EVENT_KEY_DOWN
+					: WSCONS_EVENT_KEY_UP;
+			*data = (i * 8) + j;
+			sc->sc_keycodes[i] = code[i];
+			break;
+		}
+		break;
+	}
 }
 
 static void
