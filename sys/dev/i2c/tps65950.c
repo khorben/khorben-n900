@@ -407,7 +407,7 @@ tps65950_attach(device_t parent, device_t self, void *aux)
 		aprint_normal(": LED");
 		tps65950_sysctl_attach(sc);
 
-		aprint_normal(", PIH");
+		aprint_normal(", BCI");
 		tps65950_bci_attach(sc);
 
 #if defined(OMAP_3430)
@@ -675,6 +675,7 @@ tps65950_gpio_attach(struct tps65950_softc *sc, int intrbase)
 		aprint_error_dev(sc->sc_dev, "couldn't map GPIO interrupts\n");
 		return;
 	} else {
+#if 0 /* FIXME crashes */
 		sc->sc_gpio_pic.pic_ops = &tps65950_gpio_pic_ops;
 		strlcpy(sc->sc_gpio_pic.pic_name, device_xname(sc->sc_dev),
 				sizeof(sc->sc_gpio_pic.pic_name));
@@ -683,6 +684,7 @@ tps65950_gpio_attach(struct tps65950_softc *sc, int intrbase)
 		aprint_normal(": interrupts %d..%d",
 				intrbase, intrbase + 17);
 		/* FIXME may not be enough to map the interrupts */
+#endif
 	}
 
 	gp->gp_cookie = sc;
