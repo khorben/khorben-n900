@@ -935,6 +935,10 @@ tps65950_kbd_intr(struct tps65950_softc *sc)
 	uint8_t u8;
 	uint8_t code[8];
 	int i;
+	int j;
+	u_int type;
+	int data;
+	int s;
 
 	tps65950_read_1(sc, TPS65950_KEYPAD_REG_ISR1, &u8);
 	aprint_normal_dev(sc->sc_dev, "%s() %u\n", __func__, u8);
@@ -943,19 +947,34 @@ tps65950_kbd_intr(struct tps65950_softc *sc)
 	if (u8 == 0)
 		return 0;
 
-	/* read the keycode */
+	/* read the keycodes pressed */
 	for (i = 0; i < sizeof(code); i++) {
+		/* XXX assumes registers are successive */
 		tps65950_read_1(sc, TPS65950_KEYPAD_REG_FULL_CODE_7_0 + i,
-				&code[i]); /* XXX */
-		if (code[i] == 0)
-			/* FIXME some keys may have been released */
+				&code[i]);
+	}
+
+	/* compare with the last read */
+	for (i = 0; i < sizeof(sc->sc_keycodes); i++) {
+		if (sc->sc_keycodes[i] == code[i])
 			continue;
-		aprint_normal_dev(sc->sc_dev, "%s() 0x%04x pressed\n", __func__,
-				code[i] * i);
+		for (j = 0; j < 8; j++) {
+			if ((sc->sc_keycodes[i] & (1 << j))
+					== (code[i] & (1 << j)))
+				continue;
+			/* report the keyboard event */
+			type = (code[i] & (1 << j)) ? WSCONS_EVENT_KEY_DOWN
+					: WSCONS_EVENT_KEY_UP;
+			data = (i * 8) + j;
+			s = spltty();
+			wskbd_input(sc->sc_wskbddev, type, data);
+			splx(s);
+		}
+		sc->sc_keycodes[i] = code[i];
 	}
 
 	/* acknowledge the interrupt */
-	tps65950_write_1(sc, TPS65950_KEYPAD_REG_ISR1, u8);
+	tps65950_write_1(sc, TPS65950_KEYPAD_REG_ISR1, 0xff);
 
 	return 1;
 }
@@ -1022,6 +1041,7 @@ tps65950_kbd_cngetc(void *v, u_int *type, int *data)
 
 	/* read the keycodes pressed */
 	for (i = 0; i < sizeof(code); i++) {
+		/* XXX assumes registers are successive */
 		tps65950_read_1(sc, TPS65950_KEYPAD_REG_FULL_CODE_7_0 + i,
 				&code[i]);
 	}
