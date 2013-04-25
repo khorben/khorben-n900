@@ -827,7 +827,10 @@ tps65950_kbd_enable(void *v, int on)
 
 	iic_acquire_bus(sc->sc_i2c, 0);
 
-	u8 |= TPS65950_KEYPAD_REG_IMR1_ITKPIMR1;
+	if (on)
+		u8 |= TPS65950_KEYPAD_REG_IMR1_ITKPIMR1;
+	else
+		u8 &= ~(TPS65950_KEYPAD_REG_IMR1_ITKPIMR1);
 	tps65950_write_1(sc, TPS65950_KEYPAD_REG_IMR1, u8);
 
 	iic_release_bus(sc->sc_i2c, 0);
