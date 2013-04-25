@@ -298,8 +298,50 @@ static int	tps65950_kbd_ioctl(void *, u_long, void *, int, struct lwp *);
 
 #define KC(n)		KS_KEYCODE(n)
 static const keysym_t n900_keydesc_us[] = {
-	/* FIXME really implement */
-	KC(4),			KS_a
+	KC(0),			KS_q,
+	KC(1),			KS_o,
+	KC(2),			KS_p,
+	KC(3),			KS_comma,
+	KC(4),			KS_BackSpace,
+	KC(6),			KS_a,
+	KC(7),			KS_s,
+	KC(8),			KS_w,
+	KC(9),			KS_d,
+	KC(10),			KS_f,
+	KC(11),			KS_g,
+	KC(12),			KS_h,
+	KC(13),			KS_j,
+	KC(14),			KS_k,
+	KC(15),			KS_l,
+	KC(16),			KS_e,
+	KC(17),			KS_period,
+	KC(18),			KS_Up,
+	KC(19),			KS_Return,
+	KC(20),			KS_z,
+	KC(21),			KS_x,
+	KC(22),			KS_c,
+	KC(23),			KS_f9,
+	KC(24),			KS_r,
+	KC(25),			KS_v,
+	KC(26),			KS_b,
+	KC(27),			KS_n,
+	KC(28),			KS_m,
+	KC(29),			KS_space,
+	KC(30),			KS_space,
+	KC(31),			KS_Left,
+	KC(32),			KS_t,
+	KC(33),			KS_Down,
+	KC(35),			KS_Right,
+	KC(36),			KS_Control_L,
+	KC(37),			KS_Alt_R,
+	KC(38),			KS_Shift_L,
+	KC(39),			KS_f10,
+	KC(40),			KS_y,
+	KC(47),			KS_f11,
+	KC(48),			KS_u,
+	KC(56),			KS_i,
+	KC(57),			KS_f7,
+	KC(58),			KS_f8
 };
 
 #define KBD_MAP(name, base, map) \
