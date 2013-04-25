@@ -38,6 +38,7 @@ __KERNEL_RCSID(0, "$NetBSD: tps65950.c,v 1.3 2012/12/31 21:45:36 jmcneill Exp $"
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
+#include <sys/workqueue.h>
 #include <sys/conf.h>
 #include <sys/bus.h>
 #include <sys/kmem.h>
@@ -211,6 +212,9 @@ struct tps65950_softc {
 
 	/* bci */
 	void			*sc_intr;
+	struct workqueue	*sc_workq;
+	struct work		sc_work;
+	bool			sc_queued;
 
 #if NGPIO > 0
 	/* gpio */
@@ -238,6 +242,7 @@ static int	tps65950_write_1(struct tps65950_softc *, uint8_t, uint8_t);
 static void	tps65950_sysctl_attach(struct tps65950_softc *);
 
 static int	tps65950_intr(void *);
+static void	tps65950_intr_work(struct work *work, void *v);
 
 static void	tps65950_bci_attach(struct tps65950_softc *, int);
 
@@ -525,6 +530,20 @@ static int
 tps65950_intr(void *v)
 {
 	struct tps65950_softc *sc = v;
+
+	aprint_normal_dev(sc->sc_dev, "%s()\n", __func__);
+	if (sc->sc_queued == false) {
+		workqueue_enqueue(sc->sc_workq, &sc->sc_work, NULL);
+		sc->sc_queued = true;
+	}
+
+	return 1;
+}
+
+static void
+tps65950_intr_work(struct work *work, void *v)
+{
+	struct tps65950_softc *sc = v;
 	uint8_t u8;
 
 	/* FIXME implement */
@@ -546,17 +565,30 @@ tps65950_intr(void *v)
 		tps65950_bci_intr(sc);
 
 	iic_release_bus(sc->sc_i2c, 0);
-	return 1;
+
+	sc->sc_queued = false;
 }
 
 static void
 tps65950_bci_attach(struct tps65950_softc *sc, int intr)
 {
+	int error;
+
+	/* establish the interrupt handler */
 	sc->sc_intr = intr_establish(intr, IPL_VM, IST_EDGE_FALLING,
 			tps65950_intr, sc);
 	if (sc->sc_intr == NULL) {
 		aprint_error_dev(sc->sc_dev, "couldn't establish interrupt\n");
+		return;
 	}
+
+	/* create the workqueue */
+	error = workqueue_create(&sc->sc_workq, device_xname(sc->sc_dev),
+			tps65950_intr_work, sc, (PRI_USER + MAXPRI_USER) / 2,
+			IPL_VM, 0);
+	if (error)
+		aprint_error_dev(sc->sc_dev, "couldn't create workqueue\n");
+	sc->sc_queued = false;
 }
 
 static void
@@ -572,7 +604,7 @@ tps65950_gpio_attach(struct tps65950_softc *sc, int intrbase)
 	struct gpio_chipset_tag * const gp = &sc->sc_gpio;
 	struct gpiobus_attach_args gba;
 
-	if (intrbase < 0) {
+	if (sc->sc_intr == NULL || intrbase < 0) {
 		aprint_error_dev(sc->sc_dev, "couldn't map GPIO interrupts\n");
 		return;
 	} else {
