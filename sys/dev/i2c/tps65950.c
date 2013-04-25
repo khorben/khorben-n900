@@ -1017,7 +1017,7 @@ tps65950_kbd_cngetc(void *v, u_int *type, int *data)
 		tps65950_read_1(sc, TPS65950_KEYPAD_REG_ISR1, &u8);
 		if (u8 != 0)
 			break;
-		delay(1000);
+		delay(100);
 	}
 
 	/* read the keycodes pressed */
