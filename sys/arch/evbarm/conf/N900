@@ -241,7 +241,7 @@ iic*		at omapiic?
 
 # I2C devices
 # Power Management and System Companion Device
-tps65950pm0	at iic0 addr 0x48 intr 7
+tps65950pm0	at iic0 addr 0x48 intrbase 288 intr 7
 tps65950pm1	at iic0 addr 0x49
 tps65950pm2	at iic0 addr 0x4a
 tps65950pm3	at iic0 addr 0x4b

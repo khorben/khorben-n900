@@ -118,6 +118,7 @@ struct i2c_attach_args {
 	i2c_addr_t	ia_addr;	/* address of device */
 	int		ia_size;	/* size (for EEPROMs) */
 	int		ia_intr;	/* interrupt */
+	int		ia_intrbase;	/* interrupt base */
 	int		ia_type;	/* bus type */
 	/* only set if using direct config */
 	const char *	ia_name;	/* name of the device */

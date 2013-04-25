@@ -33,6 +33,8 @@
 #include <sys/cdefs.h>
 __KERNEL_RCSID(0, "$NetBSD: tps65950.c,v 1.3 2012/12/31 21:45:36 jmcneill Exp $");
 
+#define _INTR_PRIVATE
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -44,7 +46,11 @@ __KERNEL_RCSID(0, "$NetBSD: tps65950.c,v 1.3 2012/12/31 21:45:36 jmcneill Exp $"
 
 #include <dev/i2c/i2cvar.h>
 
+#ifndef NGPIO
+# define NGPIO 1 /* XXX */
+#endif
 #if NGPIO > 0
+#include <arm/pic/picvar.h>
 #include <sys/gpio.h>
 #include <dev/gpio/gpiovar.h>
 #endif /* NGPIO > 0 */
@@ -74,6 +80,14 @@ __KERNEL_RCSID(0, "$NetBSD: tps65950.c,v 1.3 2012/12/31 21:45:36 jmcneill Exp $"
 /* PIH */
 #define TPS65950_PIH_BASE		0x80
 #define TPS65950_PIH_REG_ISR_P1		(TPS65950_PIH_BASE + 0x01)
+#define  TPS65950_PIH_REG_ISR_P1_ISR7	__BIT(7)
+#define  TPS65950_PIH_REG_ISR_P1_ISR6	__BIT(6)
+#define  TPS65950_PIH_REG_ISR_P1_ISR5	__BIT(5)
+#define  TPS65950_PIH_REG_ISR_P1_ISR4	__BIT(4)
+#define  TPS65950_PIH_REG_ISR_P1_ISR3	__BIT(3)
+#define  TPS65950_PIH_REG_ISR_P1_ISR2	__BIT(2)
+#define  TPS65950_PIH_REG_ISR_P1_ISR1	__BIT(1)
+#define  TPS65950_PIH_REG_ISR_P1_ISR0	__BIT(0)
 #define TPS65950_PIH_REG_ISR_P2		(TPS65950_PIH_BASE + 0x02)
 #define TPS65950_PIH_REG_SIR		(TPS65950_PIH_BASE + 0x03)
 
@@ -82,6 +96,50 @@ __KERNEL_RCSID(0, "$NetBSD: tps65950.c,v 1.3 2012/12/31 21:45:36 jmcneill Exp $"
 
 /* GPIO */
 #define TPS65950_GPIO_BASE		0x98
+#define TPS65950_GPIO_REG_DATAIN1	(TPS65950_GPIO_BASE + 0x01)
+#define TPS65950_GPIO_GPIODATAIN2	(TPS65950_GPIO_BASE + 0x02)
+#define TPS65950_GPIO_GPIODATAIN3	(TPS65950_GPIO_BASE + 0x03)
+#define TPS65950_GPIO_GPIODATADIR1	(TPS65950_GPIO_BASE + 0x04)
+#define TPS65950_GPIO_GPIODATADIR2	(TPS65950_GPIO_BASE + 0x05)
+#define TPS65950_GPIO_GPIODATADIR3	(TPS65950_GPIO_BASE + 0x06)
+#define TPS65950_GPIO_GPIODATAOUT1	(TPS65950_GPIO_BASE + 0x07)
+#define TPS65950_GPIO_GPIODATAOUT2	(TPS65950_GPIO_BASE + 0x08)
+#define TPS65950_GPIO_GPIODATAOUT3	(TPS65950_GPIO_BASE + 0x09)
+#define TPS65950_GPIO_CLEARGPIODATAOUT1	(TPS65950_GPIO_BASE + 0x0a)
+#define TPS65950_GPIO_CLEARGPIODATAOUT2	(TPS65950_GPIO_BASE + 0x0b)
+#define TPS65950_GPIO_CLEARGPIODATAOUT3	(TPS65950_GPIO_BASE + 0x0c)
+#define TPS65950_GPIO_SETGPIODATAOUT1	(TPS65950_GPIO_BASE + 0x0d)
+#define TPS65950_GPIO_SETGPIODATAOUT2	(TPS65950_GPIO_BASE + 0x0e)
+#define TPS65950_GPIO_SETGPIODATAOUT3	(TPS65950_GPIO_BASE + 0x0f)
+#define TPS65950_GPIO_GPIO_DEBEN1	(TPS65950_GPIO_BASE + 0x10)
+#define TPS65950_GPIO_GPIO_DEBEN2	(TPS65950_GPIO_BASE + 0x11)
+#define TPS65950_GPIO_GPIO_DEBEN3	(TPS65950_GPIO_BASE + 0x12)
+#define TPS65950_GPIO_GPIO_CTRL		(TPS65950_GPIO_BASE + 0x13)
+#define TPS65950_GPIO_GPIOPUPDCTR1	(TPS65950_GPIO_BASE + 0x14)
+#define TPS65950_GPIO_GPIOPUPDCTR2	(TPS65950_GPIO_BASE + 0x15)
+#define TPS65950_GPIO_GPIOPUPDCTR3	(TPS65950_GPIO_BASE + 0x16)
+#define TPS65950_GPIO_GPIOPUPDCTR4	(TPS65950_GPIO_BASE + 0x17)
+#define TPS65950_GPIO_GPIOPUPDCTR5	(TPS65950_GPIO_BASE + 0x18)
+#define TPS65950_GPIO_GPIO_ISR1A	(TPS65950_GPIO_BASE + 0x19)
+#define TPS65950_GPIO_GPIO_ISR2A	(TPS65950_GPIO_BASE + 0x1a)
+#define TPS65950_GPIO_GPIO_ISR3A	(TPS65950_GPIO_BASE + 0x1b)
+#define TPS65950_GPIO_GPIO_IMR1A	(TPS65950_GPIO_BASE + 0x1c)
+#define TPS65950_GPIO_GPIO_IMR2A	(TPS65950_GPIO_BASE + 0x1d)
+#define TPS65950_GPIO_GPIO_IMR3A	(TPS65950_GPIO_BASE + 0x1e)
+#define TPS65950_GPIO_GPIO_ISR1B	(TPS65950_GPIO_BASE + 0x1f)
+#define TPS65950_GPIO_GPIO_ISR2B	(TPS65950_GPIO_BASE + 0x20)
+#define TPS65950_GPIO_GPIO_ISR3B	(TPS65950_GPIO_BASE + 0x21)
+#define TPS65950_GPIO_GPIO_IMR1B	(TPS65950_GPIO_BASE + 0x22)
+#define TPS65950_GPIO_GPIO_IMR2B	(TPS65950_GPIO_BASE + 0x23)
+#define TPS65950_GPIO_GPIO_IMR3B	(TPS65950_GPIO_BASE + 0x24)
+#define TPS65950_GPIO_GPIO_EDR1		(TPS65950_GPIO_BASE + 0x28)
+#define TPS65950_GPIO_GPIO_EDR2		(TPS65950_GPIO_BASE + 0x29)
+#define TPS65950_GPIO_GPIO_EDR3		(TPS65950_GPIO_BASE + 0x2a)
+#define TPS65950_GPIO_GPIO_EDR4		(TPS65950_GPIO_BASE + 0x2b)
+#define TPS65950_GPIO_GPIO_EDR5		(TPS65950_GPIO_BASE + 0x2c)
+#define TPS65950_GPIO_GPIO_SIH_CTRL	(TPS65950_GPIO_BASE + 0x2d)
+#define TPS65950_GPIO_PMBR1		(TPS65950_GPIO_BASE + 0x2f)
+#define TPS65950_GPIO_PMBR2		(TPS65950_GPIO_BASE + 0x30)
 
 /* ID1: KEYPAD */
 #define TPS65950_KEYPAD_BASE		0xd2
@@ -132,6 +190,7 @@ struct tps65950_softc {
 	/* gpio */
 	struct gpio_chipset_tag	sc_gpio;
 	gpio_pin_t		sc_gpio_pins[18];
+	struct pic_softc	sc_gpio_pic;
 #endif /* NGPIO > 0 */
 
 #if defined(OMAP_3430)
@@ -152,18 +211,41 @@ static int	tps65950_write_1(struct tps65950_softc *, uint8_t, uint8_t);
 
 static void	tps65950_sysctl_attach(struct tps65950_softc *);
 
+static int	tps65950_intr(void *);
+
 static void	tps65950_bci_attach(struct tps65950_softc *, int);
 
+static void	tps65950_bci_intr(struct tps65950_softc *);
+
 #if NGPIO > 0
-static void	tps65950_gpio_attach(struct tps65950_softc *);
+static void	tps65950_gpio_attach(struct tps65950_softc *, int);
+
+static void	tps65950_gpio_intr(struct tps65950_softc *);
 
 static int	tps65950_gpio_pin_read(void *, int);
 static void	tps65950_gpio_pin_write(void *, int, int);
 static void	tps65950_gpio_pin_ctl(void *, int, int);
+
+static void	tps65950_gpio_pic_block_irqs(struct pic_softc *, size_t,
+		uint32_t);
+static void	tps65950_gpio_pic_unblock_irqs(struct pic_softc *, size_t,
+		uint32_t);
+static int	tps65950_gpio_pic_find_pending_irqs(struct pic_softc *);
+static void	tps65950_gpio_pic_establish_irq(struct pic_softc *,
+		struct intrsource *);
+
+const struct pic_ops tps65950_gpio_pic_ops = {
+	.pic_block_irqs = tps65950_gpio_pic_block_irqs,
+	.pic_unblock_irqs = tps65950_gpio_pic_unblock_irqs,
+	.pic_find_pending_irqs = tps65950_gpio_pic_find_pending_irqs,
+	.pic_establish_irq = tps65950_gpio_pic_establish_irq
+};
 #endif /* NGPIO > 0 */
 
 #if defined(OMAP_3430)
-static int	tps65950_intr(void *);
+static void	tps65950_kbd_attach(struct tps65950_softc *);
+
+static void	tps65950_kbd_intr(struct tps65950_softc *);
 
 static int	tps65950_kbd_enable(void *, int);
 static void	tps65950_kbd_set_leds(void *, int);
@@ -203,8 +285,6 @@ static struct wskbd_consops tps65950_kbd_consops = {
 	tps65950_kbd_cnpollc,
 	NULL
 };
-
-static void	tps65950_kbd_attach(struct tps65950_softc *);
 #endif
 
 static void	tps65950_rtc_attach(struct tps65950_softc *);
@@ -257,7 +337,7 @@ tps65950_attach(device_t parent, device_t self, void *aux)
 
 #if NGPIO > 0
 		aprint_normal(", GPIO");
-		tps65950_gpio_attach(sc);
+		tps65950_gpio_attach(sc, ia->ia_intrbase);
 #endif /* NGPIO > 0 */
 
 #if defined(OMAP_3430)
@@ -413,23 +493,76 @@ tps65950_sysctl_attach(struct tps65950_softc *sc)
 		return;
 }
 
+static int
+tps65950_intr(void *v)
+{
+	struct tps65950_softc *sc = v;
+	uint8_t u8;
+
+	/* FIXME implement */
+	aprint_normal_dev(sc->sc_dev, "%s()\n", __func__);
+
+	iic_acquire_bus(sc->sc_i2c, 0);
+
+	/* acknowledge the interrupt */
+	tps65950_read_1(sc, TPS65950_PIH_REG_ISR_P1, &u8);
+	aprint_normal_dev(sc->sc_dev, "%s() u8=%u\n", __func__, u8);
+	tps65950_write_1(sc, TPS65950_PIH_REG_ISR_P1, u8);
+
+	/* dispatch the interrupt */
+	if (u8 & TPS65950_PIH_REG_ISR_P1_ISR0)
+		tps65950_gpio_intr(sc);
+	if (u8 & TPS65950_PIH_REG_ISR_P1_ISR1)
+		tps65950_kbd_intr(sc);
+	if (u8 & TPS65950_PIH_REG_ISR_P1_ISR2)
+		tps65950_bci_intr(sc);
+
+	iic_release_bus(sc->sc_i2c, 0);
+	return 1;
+}
+
 static void
 tps65950_bci_attach(struct tps65950_softc *sc, int intr)
 {
 	aprint_normal_dev(sc->sc_dev, "%s(%d)\n", __func__, intr);
+#if 0
 	sc->sc_intr = intr_establish(intr, IPL_VM, IST_EDGE_FALLING,
 			tps65950_intr, sc);
+#else /* XXX in case that's what prevents the kernel from booting */
+	sc->sc_intr = intr_establish(intr, IPL_VM, IST_EDGE_RISING,
+			tps65950_intr, sc);
+#endif
 	if (sc->sc_intr == NULL) {
 		aprint_error_dev(sc->sc_dev, "couldn't establish interrupt\n");
 	}
 }
 
+static void
+tps65950_bci_intr(struct tps65950_softc *sc)
+{
+	/* FIXME implement */
+}
+
 #if NGPIO > 0
 static void
-tps65950_gpio_attach(struct tps65950_softc *sc)
+tps65950_gpio_attach(struct tps65950_softc *sc, int intrbase)
 {
 	struct gpio_chipset_tag * const gp = &sc->sc_gpio;
 	struct gpiobus_attach_args gba;
+
+	if (intrbase < 0) {
+		aprint_error_dev(sc->sc_dev, "couldn't map GPIO interrupts\n");
+		return;
+	} else {
+		sc->sc_gpio_pic.pic_ops = &tps65950_gpio_pic_ops;
+		strlcpy(sc->sc_gpio_pic.pic_name, device_xname(sc->sc_dev),
+				sizeof(sc->sc_gpio_pic.pic_name));
+		sc->sc_gpio_pic.pic_maxsources = 18;
+		pic_add(&sc->sc_gpio_pic, intrbase);
+		aprint_normal(": interrupts %d..%d",
+				intrbase, intrbase + 17);
+		/* FIXME may not be enough to map the interrupts */
+	}
 
 	gp->gp_cookie = sc;
 	gp->gp_pin_read = tps65950_gpio_pin_read;
@@ -443,6 +576,12 @@ tps65950_gpio_attach(struct tps65950_softc *sc)
 	/* FIXME may be missing some code here */
 
 	config_found_ia(sc->sc_dev, "gpiobus", &gba, gpiobus_print);
+}
+
+static void
+tps65950_gpio_intr(struct tps65950_softc *sc)
+{
+	pic_handle_intr(&sc->sc_gpio_pic);
 }
 
 static int
@@ -463,33 +602,65 @@ tps65950_gpio_pin_ctl(void *v, int pin, int flags)
 {
 	/* FIXME implement */
 }
+
+static void
+tps65950_gpio_pic_block_irqs(struct pic_softc *pic, size_t irq_base,
+		uint32_t irq_mask)
+{
+	/* FIXME implement */
+}
+
+static void
+tps65950_gpio_pic_unblock_irqs(struct pic_softc *pic, size_t irq_base,
+		uint32_t irq_mask)
+{
+	/* FIXME implement */
+}
+
+static int
+tps65950_gpio_pic_find_pending_irqs(struct pic_softc *pic)
+{
+	/* FIXME implement */
+	return 0;
+}
+
+static void
+tps65950_gpio_pic_establish_irq(struct pic_softc *pic, struct intrsource *is)
+{
+	/* FIXME implement */
+}
 #endif /* NGPIO > 0 */
 
 #if defined(OMAP_3430)
-static int
-tps65950_intr(void *v)
+static void
+tps65950_kbd_attach(struct tps65950_softc *sc)
 {
-	struct tps65950_softc *sc = v;
-	uint8_t u8;
+	struct wskbddev_attach_args a;
 
+	wskbd_cnattach(&tps65950_kbd_consops, sc, sc->sc_keymapdata);
+
+	a.console = 1;
+	a.keymap = sc->sc_keymapdata;
+	a.accessops = &tps65950_kbd_accessops;
+	a.accesscookie = sc;
+
+	sc->sc_wskbddev = config_found_sm_loc(sc->sc_dev, NULL, NULL, &a,
+			wskbddevprint, NULL);
+}
+
+static void
+tps65950_kbd_intr(struct tps65950_softc *sc)
+{
 	/* FIXME implement */
-	aprint_normal_dev(sc->sc_dev, "%s()\n", __func__);
-
-	iic_acquire_bus(sc->sc_i2c, 0);
-
-	/* acknowledge the interrupt */
-	tps65950_read_1(sc, TPS65950_PIH_REG_ISR_P1, &u8);
-	aprint_normal_dev(sc->sc_dev, "%s() u8=%u\n", __func__, u8);
-	tps65950_write_1(sc, TPS65950_PIH_REG_ISR_P1, u8);
-
-	iic_release_bus(sc->sc_i2c, 0);
-	return 1;
 }
 
 static int
 tps65950_kbd_enable(void *v, int on)
 {
 	struct tps65950_softc *sc = v;
+
+	if (sc->sc_intr == NULL)
+		return ENXIO;
 
 	iic_acquire_bus(sc->sc_i2c, 0);
 
@@ -530,22 +701,6 @@ tps65950_kbd_cngetc(void *v, u_int *type, int *data)
 static void
 tps65950_kbd_cnpollc(void *v, int on)
 {
-}
-
-static void
-tps65950_kbd_attach(struct tps65950_softc *sc)
-{
-	struct wskbddev_attach_args a;
-
-	wskbd_cnattach(&tps65950_kbd_consops, sc, sc->sc_keymapdata);
-
-	a.console = 1;
-	a.keymap = sc->sc_keymapdata;
-	a.accessops = &tps65950_kbd_accessops;
-	a.accesscookie = sc;
-
-	sc->sc_wskbddev = config_found_sm_loc(sc->sc_dev, NULL, NULL, &a,
-			wskbddevprint, NULL);
 }
 #endif
 
