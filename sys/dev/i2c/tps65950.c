@@ -594,7 +594,42 @@ tps65950_gpio_pin_read(void *v, int pin)
 static void
 tps65950_gpio_pin_write(void *v, int pin, int value)
 {
-	/* FIXME implement */
+	struct tps65950_softc *sc = v;
+	uint8_t reg;
+	uint8_t bit;
+	uint8_t val;
+	uint8_t new;
+
+	if (pin < 0)
+		return;
+	else if (pin < 8)
+	{
+		reg = TPS65950_GPIO_GPIODATAOUT1;
+		bit = pin;
+	}
+	else if (pin < 16)
+	{
+		reg = TPS65950_GPIO_GPIODATAOUT2;
+		bit = pin - 8;
+	}
+	else if (pin < 18)
+	{
+		reg = TPS65950_GPIO_GPIODATAOUT3;
+		bit = pin - 16;
+	}
+	else
+		return;
+
+	iic_acquire_bus(sc->sc_i2c, 0);
+	tps65950_read_1(sc, reg, &val);
+	new = val;
+	if (value)
+		new |= (1 << bit);
+	else
+		new &= ~(1 << bit);
+	if (new != val)
+		tps65950_write_1(sc, reg, new);
+	iic_release_bus(sc->sc_i2c, 0);
 }
 
 static void
