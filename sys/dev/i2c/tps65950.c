@@ -96,7 +96,7 @@ __KERNEL_RCSID(0, "$NetBSD: tps65950.c,v 1.3 2012/12/31 21:45:36 jmcneill Exp $"
 
 /* GPIO */
 #define TPS65950_GPIO_BASE		0x98
-#define TPS65950_GPIO_REG_DATAIN1	(TPS65950_GPIO_BASE + 0x01)
+#define TPS65950_GPIO_GPIODATAIN1	(TPS65950_GPIO_BASE + 0x01)
 #define TPS65950_GPIO_GPIODATAIN2	(TPS65950_GPIO_BASE + 0x02)
 #define TPS65950_GPIO_GPIODATAIN3	(TPS65950_GPIO_BASE + 0x03)
 #define TPS65950_GPIO_GPIODATADIR1	(TPS65950_GPIO_BASE + 0x04)
@@ -587,8 +587,36 @@ tps65950_gpio_intr(struct tps65950_softc *sc)
 static int
 tps65950_gpio_pin_read(void *v, int pin)
 {
-	/* FIXME implement */
-	return ENOSYS;
+	struct tps65950_softc *sc = v;
+	uint8_t reg;
+	uint8_t bit;
+	uint8_t val;
+
+	if (pin < 0)
+		return ENODEV;
+	else if (pin < 8)
+	{
+		reg = TPS65950_GPIO_GPIODATAIN1;
+		bit = pin;
+	}
+	else if (pin < 16)
+	{
+		reg = TPS65950_GPIO_GPIODATAIN2;
+		bit = pin - 8;
+	}
+	else if (pin < 18)
+	{
+		reg = TPS65950_GPIO_GPIODATAIN3;
+		bit = pin - 16;
+	}
+	else
+		return ENODEV;
+
+	iic_acquire_bus(sc->sc_i2c, 0);
+	tps65950_read_1(sc, reg, &val);
+	iic_release_bus(sc->sc_i2c, 0);
+
+	return val & (1 << bit);
 }
 
 static void
