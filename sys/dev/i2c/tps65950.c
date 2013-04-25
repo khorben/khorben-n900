@@ -142,8 +142,34 @@ __KERNEL_RCSID(0, "$NetBSD: tps65950.c,v 1.3 2012/12/31 21:45:36 jmcneill Exp $"
 #define TPS65950_GPIO_PMBR2		(TPS65950_GPIO_BASE + 0x30)
 
 /* ID1: KEYPAD */
-#define TPS65950_KEYPAD_BASE		0xd2
-#define TPS65950_KEYPAD_REG_IMR1	(TPS65950_KEYPAD_BASE + 0x12)
+#define TPS65950_KEYPAD_BASE			0xd2
+#define TPS65950_KEYPAD_REG_CTRL_REG		(TPS65950_KEYPAD_BASE + 0x00)
+#define  TPS65950_KEYPAD_REG_CTRL_REG_KBD_ON	__BIT(6)
+#define  TPS65950_KEYPAD_REG_CTRL_REG_RP_EN	__BIT(5)
+#define  TPS65950_KEYPAD_REG_CTRL_REG_TOLE_EN	__BIT(4)
+#define  TPS65950_KEYPAD_REG_CTRL_REG_TOE_EN	__BIT(3)
+#define  TPS65950_KEYPAD_REG_CTRL_REG_LK_EN	__BIT(2)
+#define  TPS65950_KEYPAD_REG_CTRL_REG_SOFTMODEN	__BIT(1)
+#define  TPS65950_KEYPAD_REG_CTRL_REG_SOFT_NRST	__BIT(0)
+#define TPS65950_KEYPAD_REG_FULL_CODE_7_0	(TPS65950_KEYPAD_BASE + 0x09)
+#define TPS65950_KEYPAD_REG_FULL_CODE_15_8	(TPS65950_KEYPAD_BASE + 0x0a)
+#define TPS65950_KEYPAD_REG_FULL_CODE_23_16	(TPS65950_KEYPAD_BASE + 0x0b)
+#define TPS65950_KEYPAD_REG_FULL_CODE_31_24	(TPS65950_KEYPAD_BASE + 0x0c)
+#define TPS65950_KEYPAD_REG_FULL_CODE_39_32	(TPS65950_KEYPAD_BASE + 0x0d)
+#define TPS65950_KEYPAD_REG_FULL_CODE_47_40	(TPS65950_KEYPAD_BASE + 0x0e)
+#define TPS65950_KEYPAD_REG_FULL_CODE_55_48	(TPS65950_KEYPAD_BASE + 0x0f)
+#define TPS65950_KEYPAD_REG_FULL_CODE_63_56	(TPS65950_KEYPAD_BASE + 0x10)
+#define TPS65950_KEYPAD_REG_ISR1		(TPS65950_KEYPAD_BASE + 0x11)
+#define  TPS65950_KEYPAD_REG_ISR1_ITKPISR1	__BIT(0)
+#define TPS65950_KEYPAD_REG_IMR1		(TPS65950_KEYPAD_BASE + 0x12)
+#define  TPS65950_KEYPAD_REG_IMR1_ITMISIMR1	__BIT(3)
+#define  TPS65950_KEYPAD_REG_IMR1_ITTOIMR1	__BIT(2)
+#define  TPS65950_KEYPAD_REG_IMR1_ITLKIMR1	__BIT(1)
+#define  TPS65950_KEYPAD_REG_IMR1_ITKPIMR1	__BIT(0)
+#define TPS65950_KEYPAD_REG_SIH_CTRL		(TPS65950_KEYPAD_BASE + 0x17)
+#define  TPS65950_KEYPAD_REG_SIH_CTRL_COR	__BIT(2)
+#define  TPS65950_KEYPAD_REG_SIH_CTRL_PENDDIS	__BIT(1)
+#define  TPS65950_KEYPAD_REG_SIH_CTRL_EXCLEN	__BIT(0)
 
 /* ID2 */
 #define TPS65950_ID2_IDCODE_7_0		0x85
@@ -734,7 +760,24 @@ tps65950_gpio_pic_establish_irq(struct pic_softc *pic, struct intrsource *is)
 static void
 tps65950_kbd_attach(struct tps65950_softc *sc)
 {
+	uint8_t u8;
 	struct wskbddev_attach_args a;
+
+	iic_acquire_bus(sc->sc_i2c, 0);
+
+	/* reset the keyboard */
+	tps65950_write_1(sc, TPS65950_KEYPAD_REG_CTRL_REG, 0);
+
+	/* configure the keyboard */
+	u8 = TPS65950_KEYPAD_REG_CTRL_REG_KBD_ON
+		| TPS65950_KEYPAD_REG_CTRL_REG_SOFTMODEN
+		| TPS65950_KEYPAD_REG_CTRL_REG_SOFT_NRST;
+	tps65950_write_1(sc, TPS65950_KEYPAD_REG_CTRL_REG, u8);
+	u8 = TPS65950_KEYPAD_REG_SIH_CTRL_COR
+		| TPS65950_KEYPAD_REG_SIH_CTRL_EXCLEN;
+	tps65950_write_1(sc, TPS65950_KEYPAD_REG_SIH_CTRL, u8);
+
+	iic_release_bus(sc->sc_i2c, 0);
 
 	wskbd_cnattach(&tps65950_kbd_consops, sc, sc->sc_keymapdata);
 
@@ -750,21 +793,42 @@ tps65950_kbd_attach(struct tps65950_softc *sc)
 static void
 tps65950_kbd_intr(struct tps65950_softc *sc)
 {
-	/* FIXME implement */
+	uint8_t u8;
+	uint8_t code[8];
+	int i;
+
+	tps65950_read_1(sc, TPS65950_KEYPAD_REG_ISR1, &u8);
+	aprint_normal_dev(sc->sc_dev, "%s() %u\n", __func__, u8);
+
+	/* check if there is anything to do */
+	if (u8 == 0)
+		return;
+
+	/* read the keycode */
+	for (i = 0; i < sizeof(code); i++) {
+		tps65950_read_1(sc, TPS65950_KEYPAD_REG_FULL_CODE_7_0 + i,
+				&code[i]); /* XXX */
+		if (code[i] == 0)
+			/* FIXME some keys may have been released */
+			continue;
+		aprint_normal_dev(sc->sc_dev, "%s() 0x%04x pressed\n", __func__,
+				code[i] * i);
+	}
 }
 
 static int
 tps65950_kbd_enable(void *v, int on)
 {
 	struct tps65950_softc *sc = v;
+	uint8_t u8 = 0;
 
 	if (sc->sc_intr == NULL)
 		return ENXIO;
 
 	iic_acquire_bus(sc->sc_i2c, 0);
 
-	/* FIXME really implement */
-	tps65950_write_1(sc, TPS65950_KEYPAD_REG_IMR1, 0);
+	u8 |= TPS65950_KEYPAD_REG_IMR1_ITKPIMR1;
+	tps65950_write_1(sc, TPS65950_KEYPAD_REG_IMR1, u8);
 
 	iic_release_bus(sc->sc_i2c, 0);
 	return 0;
