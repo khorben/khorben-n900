@@ -439,7 +439,7 @@ tps65950_attach(device_t parent, device_t self, void *aux)
 		tps65950_pih_attach(sc, ia->ia_intr);
 
 #if NGPIO > 0
-		aprint_normal(", GPIO\n");
+		aprint_normal(", GPIO");
 		tps65950_gpio_attach(sc, ia->ia_intrbase);
 #else
 		aprint_normal("\n");
@@ -717,6 +717,7 @@ tps65950_gpio_attach(struct tps65950_softc *sc, int intrbase)
 
 	/* map interrupts */
 	if (sc->sc_intr == NULL || intrbase < 0) {
+		aprint_normal("\n");
 		aprint_error_dev(sc->sc_dev, "couldn't map GPIO interrupts\n");
 		return;
 	} else {
@@ -726,7 +727,7 @@ tps65950_gpio_attach(struct tps65950_softc *sc, int intrbase)
 				sizeof(sc->sc_gpio_pic.pic_name));
 		sc->sc_gpio_pic.pic_maxsources = 18;
 		pic_add(&sc->sc_gpio_pic, intrbase);
-		aprint_normal(": interrupts %d..%d",
+		aprint_normal(": interrupts %d..%d\n",
 				intrbase, intrbase + 17);
 		/* FIXME may not be enough to map the interrupts */
 #endif
