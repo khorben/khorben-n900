@@ -453,11 +453,11 @@ tps65950_attach(device_t parent, device_t self, void *aux)
 		tps65950_bci_attach(sc);
 
 #if defined(OMAP_3430)
-		aprint_normal(", KEYPAD");
+		aprint_normal(", KEYPAD\n");
 		tps65950_kbd_attach(sc);
-#endif
-
+#else
 		aprint_normal("\n");
+#endif
 		break;
 	case TPS65950_ADDR_ID4:
 		aprint_normal(": RTC, WATCHDOG\n");
@@ -721,16 +721,15 @@ tps65950_gpio_attach(struct tps65950_softc *sc, int intrbase)
 		aprint_error_dev(sc->sc_dev, "couldn't map GPIO interrupts\n");
 		return;
 	} else {
-#if 0 /* FIXME crashes */
 		sc->sc_gpio_pic.pic_ops = &tps65950_gpio_pic_ops;
 		strlcpy(sc->sc_gpio_pic.pic_name, device_xname(sc->sc_dev),
 				sizeof(sc->sc_gpio_pic.pic_name));
 		sc->sc_gpio_pic.pic_maxsources = 18;
+#if 0 /* FIXME crashes */
 		pic_add(&sc->sc_gpio_pic, intrbase);
+#endif
 		aprint_normal(": interrupts %d..%d\n",
 				intrbase, intrbase + 17);
-		/* FIXME may not be enough to map the interrupts */
-#endif
 	}
 
 	gp->gp_cookie = sc;
