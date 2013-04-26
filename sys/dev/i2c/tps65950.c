@@ -728,8 +728,7 @@ tps65950_gpio_attach(struct tps65950_softc *sc, int intrbase)
 #if 0 /* FIXME crashes */
 		pic_add(&sc->sc_gpio_pic, intrbase);
 #endif
-		aprint_normal(": interrupts %d..%d\n",
-				intrbase, intrbase + 17);
+		aprint_normal(": interrupts %d..%d\n", intrbase, intrbase + 17);
 	}
 
 	gp->gp_cookie = sc;
