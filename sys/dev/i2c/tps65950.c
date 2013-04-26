@@ -439,11 +439,11 @@ tps65950_attach(device_t parent, device_t self, void *aux)
 		tps65950_pih_attach(sc, ia->ia_intr);
 
 #if NGPIO > 0
-		aprint_normal(", GPIO");
+		aprint_normal(", GPIO\n");
 		tps65950_gpio_attach(sc, ia->ia_intrbase);
-#endif /* NGPIO > 0 */
-
+#else
 		aprint_normal("\n");
+#endif /* NGPIO > 0 */
 		break;
 	case TPS65950_ADDR_ID3:
 		aprint_normal(": LED");
@@ -704,6 +704,9 @@ tps65950_gpio_attach(struct tps65950_softc *sc, int intrbase)
 {
 	struct gpio_chipset_tag * const gp = &sc->sc_gpio;
 	struct gpiobus_attach_args gba;
+	gpio_pin_t *pins;
+	uint32_t mask;
+	int pin;
 
 	/* disable interrupts */
 	iic_acquire_bus(sc->sc_i2c, 0);
@@ -738,7 +741,14 @@ tps65950_gpio_attach(struct tps65950_softc *sc, int intrbase)
 	gba.gba_pins = sc->sc_gpio_pins;
 	gba.gba_npins = __arraycount(sc->sc_gpio_pins);
 
-	/* FIXME may be missing some code here */
+	for (pin = 0, mask = 1, pins = sc->sc_gpio_pins;
+			pin < 18; pin++, mask <<= 1, pins++) {
+		pins->pin_num = pin;
+		pins->pin_caps = GPIO_PIN_INPUT | GPIO_PIN_OUTPUT;
+		pins->pin_flags = GPIO_PIN_INPUT;
+		/* FIXME to be reviewed */
+		pins->pin_state = GPIO_PIN_HIGH;
+	}
 
 	config_found_ia(sc->sc_dev, "gpiobus", &gba, gpiobus_print);
 }
