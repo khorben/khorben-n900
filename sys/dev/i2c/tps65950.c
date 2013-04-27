@@ -245,6 +245,7 @@ struct tps65950_softc {
 };
 
 #if defined(OMAP_3430)
+/* XXX global workqueue to handle keyboard events on the right address */
 static struct workqueue		*kbd_workqueue;
 static struct work		kbd_workqueue_work;
 static bool			kbd_workqueue_available;
