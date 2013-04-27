@@ -872,14 +872,38 @@ static void
 tps65950_gpio_pic_block_irqs(struct pic_softc *pic, size_t irq_base,
 		uint32_t irq_mask)
 {
-	/* FIXME implement */
+	struct tps65950_softc *sc = PIC_TO_SOFTC(pic);
+	int i;
+	const uint32_t reg[3] = { TPS65950_GPIO_GPIO_IMR1A,
+		TPS65950_GPIO_GPIO_IMR2A, TPS65950_GPIO_GPIO_IMR3A };
+	uint8_t u8;
+
+	iic_acquire_bus(sc->sc_i2c, 0);
+	for (i = 0; i < 3; i++) {
+		tps65950_read_1(sc, reg[i], &u8);
+		u8 &= ~((irq_mask >> (i * 8)) & 0xff);
+		tps65950_write_1(sc, reg[i], u8);
+	}
+	iic_release_bus(sc->sc_i2c, 0);
 }
 
 static void
 tps65950_gpio_pic_unblock_irqs(struct pic_softc *pic, size_t irq_base,
 		uint32_t irq_mask)
 {
-	/* FIXME implement */
+	struct tps65950_softc *sc = PIC_TO_SOFTC(pic);
+	int i;
+	const uint32_t reg[3] = { TPS65950_GPIO_GPIO_IMR1A,
+		TPS65950_GPIO_GPIO_IMR2A, TPS65950_GPIO_GPIO_IMR3A };
+	uint8_t u8;
+
+	iic_acquire_bus(sc->sc_i2c, 0);
+	for (i = 0; i < 3; i++) {
+		tps65950_read_1(sc, reg[i], &u8);
+		u8 |= (irq_mask >> (i * 8)) & 0xff;
+		tps65950_write_1(sc, reg[i], u8);
+	}
+	iic_release_bus(sc->sc_i2c, 0);
 }
 
 static int
@@ -889,12 +913,14 @@ tps65950_gpio_pic_find_pending_irqs(struct pic_softc *pic)
 	uint32_t pending;
 	uint8_t u8;
 
+	iic_acquire_bus(sc->sc_i2c, 0);
 	tps65950_read_1(sc, TPS65950_GPIO_GPIO_ISR1A, &u8);
 	pending = u8;
 	tps65950_read_1(sc, TPS65950_GPIO_GPIO_ISR2A, &u8);
 	pending |= (u8 << 8);
 	tps65950_read_1(sc, TPS65950_GPIO_GPIO_ISR3A, &u8);
 	pending |= ((u8 & 0x3) << 16);
+	iic_release_bus(sc->sc_i2c, 0);
 	return pending;
 }
 
@@ -1039,8 +1065,6 @@ tps65950_kbd_cngetc(void *v, u_int *type, int *data)
 	int i;
 	int j;
 
-	iic_acquire_bus(sc->sc_i2c, 0);
-
 	for (;;) {
 		/* poll for keycodes */
 		tps65950_read_1(sc, TPS65950_KEYPAD_REG_ISR1, &u8);
@@ -1058,8 +1082,6 @@ tps65950_kbd_cngetc(void *v, u_int *type, int *data)
 
 	/* acknowledge the interrupt */
 	tps65950_write_1(sc, TPS65950_KEYPAD_REG_ISR1, 0xff);
-
-	iic_release_bus(sc->sc_i2c, 0);
 
 	/* compare with the last read */
 	for (i = 0; i < sizeof(sc->sc_keycodes); i++) {
@@ -1082,6 +1104,12 @@ tps65950_kbd_cngetc(void *v, u_int *type, int *data)
 static void
 tps65950_kbd_cnpollc(void *v, int on)
 {
+	struct tps65950_softc *sc = v;
+
+	if (on)
+		iic_acquire_bus(sc->sc_i2c, 0);
+	else
+		iic_release_bus(sc->sc_i2c, 0);
 }
 #endif
 
