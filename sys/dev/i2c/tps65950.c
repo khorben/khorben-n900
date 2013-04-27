@@ -244,6 +244,12 @@ struct tps65950_softc {
 	struct todr_chip_handle	sc_todr;
 };
 
+#if defined(OMAP_3430)
+static struct workqueue		*kbd_workqueue;
+static struct work		kbd_workqueue_work;
+static bool			kbd_workqueue_available;
+#endif
+
 #define PIC_TO_SOFTC(pic) \
 	((struct tps65950_softc *)((char *)(pic) - \
 		offsetof(struct tps65950_softc, sc_gpio_pic)))
@@ -294,6 +300,7 @@ const struct pic_ops tps65950_gpio_pic_ops = {
 static void	tps65950_kbd_attach(struct tps65950_softc *);
 
 static void	tps65950_kbd_intr(struct tps65950_softc *);
+static void	tps65950_kbd_intr_work(struct work *, void *);
 
 static int	tps65950_kbd_enable(void *, int);
 static void	tps65950_kbd_set_leds(void *, int);
@@ -623,8 +630,10 @@ tps65950_intr_work(struct work *work, void *v)
 	if (u8 & TPS65950_PIH_REG_ISR_P1_ISR0)
 		tps65950_gpio_intr(sc);
 #endif /* NGPIO > 0 */
+#ifdef OMAP_3430
 	if (u8 & TPS65950_PIH_REG_ISR_P1_ISR1)
 		tps65950_kbd_intr(sc);
+#endif
 	if (u8 & TPS65950_PIH_REG_ISR_P1_ISR2)
 		tps65950_bci_intr(sc);
 #if 0 /* FIXME implement */
@@ -944,6 +953,7 @@ tps65950_gpio_pic_establish_irq(struct pic_softc *pic, struct intrsource *is)
 	switch (is->is_type) {
 		case IST_LEVEL_LOW:
 		case IST_LEVEL_HIGH:
+			/* FIXME implement */
 			return;
 		case IST_EDGE_FALLING:
 			reg = edge[index];
@@ -974,6 +984,7 @@ tps65950_kbd_attach(struct tps65950_softc *sc)
 {
 	uint8_t u8;
 	struct wskbddev_attach_args a;
+	int error;
 
 	iic_acquire_bus(sc->sc_i2c, 0);
 
@@ -1000,12 +1011,30 @@ tps65950_kbd_attach(struct tps65950_softc *sc)
 
 	sc->sc_wskbddev = config_found_sm_loc(sc->sc_dev, NULL, NULL, &a,
 			wskbddevprint, NULL);
+
+	/* create the workqueue */
+	error = workqueue_create(&kbd_workqueue, device_xname(sc->sc_dev),
+			tps65950_kbd_intr_work, sc, PRIO_MAX, IPL_VM, 0);
+	if (error) {
+		aprint_error_dev(sc->sc_dev, "couldn't create workqueue\n");
+		return;
+	}
+	kbd_workqueue_available = true;
 }
 
 static void
 tps65950_kbd_intr(struct tps65950_softc *sc)
 {
-#if 0 /* FIXME run this in the context of ID3 */
+	if (kbd_workqueue_available) {
+		workqueue_enqueue(kbd_workqueue, &kbd_workqueue_work, NULL);
+		kbd_workqueue_available = false;
+	}
+}
+
+static void
+tps65950_kbd_intr_work(struct work *work, void *v)
+{
+	struct tps65950_softc *sc = v;
 	uint8_t u8;
 	uint8_t code[8];
 	int i;
@@ -1019,7 +1048,7 @@ tps65950_kbd_intr(struct tps65950_softc *sc)
 
 	/* check if there is anything to do */
 	if (u8 == 0)
-		return 0;
+		return;
 
 	/* read the keycodes pressed */
 	for (i = 0; i < sizeof(code); i++) {
@@ -1049,7 +1078,9 @@ tps65950_kbd_intr(struct tps65950_softc *sc)
 
 	/* acknowledge the interrupt */
 	tps65950_write_1(sc, TPS65950_KEYPAD_REG_ISR1, 0xff);
-#endif
+
+	/* allow queueing again */
+	kbd_workqueue_available = true;
 }
 
 static int
