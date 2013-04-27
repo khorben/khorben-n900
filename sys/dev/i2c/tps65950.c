@@ -599,6 +599,7 @@ tps65950_intr(void *v)
 		sc->sc_queued = true;
 	}
 
+	/* disable the interrupt until it's properly handled */
 	return 0;
 }
 
@@ -1004,7 +1005,7 @@ tps65950_kbd_attach(struct tps65950_softc *sc)
 static void
 tps65950_kbd_intr(struct tps65950_softc *sc)
 {
-#if 0
+#if 0 /* FIXME run this in the context of ID3 */
 	uint8_t u8;
 	uint8_t code[8];
 	int i;
