@@ -713,7 +713,7 @@ tps65950_gpio_attach(struct tps65950_softc *sc, int intrbase)
 		strlcpy(sc->sc_gpio_pic.pic_name, device_xname(sc->sc_dev),
 				sizeof(sc->sc_gpio_pic.pic_name));
 		sc->sc_gpio_pic.pic_maxsources = 18;
-#if 0 /* FIXME crashes */
+#if 1 /* FIXME crashes (interrupt source too high? too many PICs?) */
 		pic_add(&sc->sc_gpio_pic, intrbase);
 #endif
 		aprint_normal(": interrupts %d..%d\n", intrbase, intrbase + 17);
@@ -1071,15 +1071,6 @@ tps65950_kbd_cngetc(void *v, u_int *type, int *data)
 static void
 tps65950_kbd_cnpollc(void *v, int on)
 {
-#if 0
-	struct tps65950_softc *sc = v;
-
-	if (on) {
-		intr_disable(sc->sc_intr);
-	} else {
-		intr_enable(sc->sc_intr);
-	}
-#endif
 }
 #endif
 
