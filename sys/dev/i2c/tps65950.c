@@ -35,6 +35,8 @@ __KERNEL_RCSID(0, "$NetBSD: tps65950.c,v 1.3 2012/12/31 21:45:36 jmcneill Exp $"
 
 #define _INTR_PRIVATE
 
+#include "gpio.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -47,9 +49,6 @@ __KERNEL_RCSID(0, "$NetBSD: tps65950.c,v 1.3 2012/12/31 21:45:36 jmcneill Exp $"
 
 #include <dev/i2c/i2cvar.h>
 
-#ifndef NGPIO
-# define NGPIO 1 /* XXX */
-#endif
 #if NGPIO > 0
 #include <arm/pic/picvar.h>
 #include <sys/gpio.h>
@@ -592,26 +591,13 @@ tps65950_intr(void *v)
 {
 	struct tps65950_softc *sc = v;
 
-#if 1
 	aprint_normal_dev(sc->sc_dev, "%s() %p %u\n", __func__, sc->sc_intr,
 			sc->sc_queued);
 	if (sc->sc_workq != NULL && sc->sc_queued == false) {
 		workqueue_enqueue(sc->sc_workq, &sc->sc_work, NULL);
 		sc->sc_queued = true;
 	}
-#else
-	aprint_normal_dev(sc->sc_dev, "%s() %p %u\n", __func__, sc->sc_intr,
-			sc->sc_queued);
-	if (sc->sc_intr != NULL) {
-		sc->sc_intr = intr_establish(7, IPL_VM, IST_EDGE_FALLING,
-				tps65950_intr, sc);
-		if (sc->sc_intr == NULL) {
-			aprint_error_dev(sc->sc_dev,
-					"couldn't establish interrupt\n");
-		}
-		sc->sc_intr = NULL;
-	}
-#endif
+	intr_disable(sc->sc_intr);
 
 	return 1;
 }
@@ -633,8 +619,10 @@ tps65950_intr_work(struct work *work, void *v)
 	tps65950_write_1(sc, TPS65950_PIH_REG_ISR_P1, u8);
 
 	/* dispatch the interrupt */
+#if NGPIO > 0
 	if (u8 & TPS65950_PIH_REG_ISR_P1_ISR0)
 		tps65950_gpio_intr(sc);
+#endif /* NGPIO > 0 */
 	if (u8 & TPS65950_PIH_REG_ISR_P1_ISR1)
 		tps65950_kbd_intr(sc);
 	if (u8 & TPS65950_PIH_REG_ISR_P1_ISR2)
@@ -650,7 +638,9 @@ tps65950_intr_work(struct work *work, void *v)
 
 	iic_release_bus(sc->sc_i2c, 0);
 
+	/* re-enable the interrupt */
 	sc->sc_queued = false;
+	intr_enable(sc->sc_intr);
 }
 
 static void
@@ -658,20 +648,21 @@ tps65950_pih_attach(struct tps65950_softc *sc, int intr)
 {
 	int error;
 
-	/* establish the interrupt handler */
-	sc->sc_intr = intr_establish(intr, IPL_VM, IST_EDGE_FALLING,
-			tps65950_intr, sc);
-	if (sc->sc_intr == NULL) {
-		aprint_error_dev(sc->sc_dev, "couldn't establish interrupt\n");
-		return;
-	}
-
 	/* create the workqueue */
 	error = workqueue_create(&sc->sc_workq, device_xname(sc->sc_dev),
 			tps65950_intr_work, sc, 0, IPL_VM, WQ_MPSAFE);
-	if (error)
+	if (error) {
 		aprint_error_dev(sc->sc_dev, "couldn't create workqueue\n");
+		return;
+	}
 	sc->sc_queued = false;
+
+	/* establish the interrupt handler */
+	sc->sc_intr = intr_establish(intr, IPL_VM, IST_LEVEL, tps65950_intr,
+			sc);
+	if (sc->sc_intr == NULL) {
+		aprint_error_dev(sc->sc_dev, "couldn't establish interrupt\n");
+	}
 }
 
 static void
@@ -1081,19 +1072,13 @@ tps65950_kbd_cngetc(void *v, u_int *type, int *data)
 static void
 tps65950_kbd_cnpollc(void *v, int on)
 {
-#if 0
 	struct tps65950_softc *sc = v;
 
-	/* FIXME tell the interrupt handler that we're polling instead?
-	 * - would allow the I2C controller to keep working
-	 * - would then need a way to let the workqueue get scheduled within
-	 *   cngetc() */
 	if (on) {
-		sc->sc_spl = splbio();
+		intr_disable(sc->sc_intr);
 	} else {
-		splx(sc->sc_spl);
+		intr_enable(sc->sc_intr);
 	}
-#endif
 }
 #endif
 
