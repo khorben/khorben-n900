@@ -244,6 +244,10 @@ struct tps65950_softc {
 	struct todr_chip_handle	sc_todr;
 };
 
+#define PIC_TO_SOFTC(pic) \
+	((struct tps65950_softc *)((char *)(pic) - \
+		offsetof(struct tps65950_softc, sc_gpio_pic)))
+
 static int	tps65950_match(device_t, cfdata_t, void *);
 static void	tps65950_attach(device_t, device_t, void *);
 
@@ -743,9 +747,7 @@ tps65950_gpio_attach(struct tps65950_softc *sc, int intrbase)
 static void
 tps65950_gpio_intr(struct tps65950_softc *sc)
 {
-#if 0
 	pic_handle_intr(&sc->sc_gpio_pic);
-#endif
 }
 
 static int
@@ -883,8 +885,17 @@ tps65950_gpio_pic_unblock_irqs(struct pic_softc *pic, size_t irq_base,
 static int
 tps65950_gpio_pic_find_pending_irqs(struct pic_softc *pic)
 {
-	/* FIXME implement */
-	return 0;
+	struct tps65950_softc *sc = PIC_TO_SOFTC(pic);
+	uint32_t pending;
+	uint8_t u8;
+
+	tps65950_read_1(sc, TPS65950_GPIO_GPIO_ISR1A, &u8);
+	pending = u8;
+	tps65950_read_1(sc, TPS65950_GPIO_GPIO_ISR2A, &u8);
+	pending |= (u8 << 8);
+	tps65950_read_1(sc, TPS65950_GPIO_GPIO_ISR3A, &u8);
+	pending |= ((u8 & 0x3) << 16);
+	return pending;
 }
 
 static void
