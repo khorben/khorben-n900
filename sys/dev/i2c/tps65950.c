@@ -921,13 +921,49 @@ tps65950_gpio_pic_find_pending_irqs(struct pic_softc *pic)
 	tps65950_read_1(sc, TPS65950_GPIO_GPIO_ISR3A, &u8);
 	pending |= ((u8 & 0x3) << 16);
 	iic_release_bus(sc->sc_i2c, 0);
+	aprint_normal_dev(sc->sc_dev, "%s() 0x%08x\n", __func__, pending);
 	return pending;
 }
 
 static void
 tps65950_gpio_pic_establish_irq(struct pic_softc *pic, struct intrsource *is)
 {
-	/* FIXME implement */
+	struct tps65950_softc *sc = PIC_TO_SOFTC(pic);
+	int index;
+	int shift;
+	const uint32_t edge[5] = { TPS65950_GPIO_GPIO_EDR1,
+		TPS65950_GPIO_GPIO_EDR2, TPS65950_GPIO_GPIO_EDR3,
+		TPS65950_GPIO_GPIO_EDR4, TPS65950_GPIO_GPIO_EDR5 };
+	uint32_t reg;
+	uint8_t bits;
+	uint8_t u8;
+
+	index = is->is_irq / 4;
+	shift = (is->is_irq % 4) * 2;
+	switch (is->is_type) {
+		case IST_LEVEL_LOW:
+		case IST_LEVEL_HIGH:
+			return;
+		case IST_EDGE_FALLING:
+			reg = edge[index];
+			bits = 0x1;
+			break;
+		case IST_EDGE_RISING:
+			reg = edge[index];
+			bits = 0x2;
+			break;
+		case IST_EDGE_BOTH:
+			reg = edge[index];
+			bits = 0x3;
+			break;
+		default:
+			return;
+	}
+	iic_acquire_bus(sc->sc_i2c, 0);
+	tps65950_read_1(sc, reg, &u8);
+	u8 |= bits << shift;
+	tps65950_write_1(sc, reg, u8);
+	iic_release_bus(sc->sc_i2c, 0);
 }
 #endif /* NGPIO > 0 */
 
