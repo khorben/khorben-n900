@@ -237,9 +237,6 @@ struct tps65950_softc {
 #if defined(OMAP_3430)
 	/* keypad */
 	device_t		sc_wskbddev;
-#if 0
-	int			sc_spl;
-#endif
 	uint8_t			sc_keycodes[8];
 #endif
 
@@ -292,7 +289,7 @@ const struct pic_ops tps65950_gpio_pic_ops = {
 #if defined(OMAP_3430)
 static void	tps65950_kbd_attach(struct tps65950_softc *);
 
-static int	tps65950_kbd_intr(struct tps65950_softc *);
+static void	tps65950_kbd_intr(struct tps65950_softc *);
 
 static int	tps65950_kbd_enable(void *, int);
 static void	tps65950_kbd_set_leds(void *, int);
@@ -593,13 +590,12 @@ tps65950_intr(void *v)
 
 	aprint_normal_dev(sc->sc_dev, "%s() %p %u\n", __func__, sc->sc_intr,
 			sc->sc_queued);
-	if (sc->sc_workq != NULL && sc->sc_queued == false) {
+	if (sc->sc_queued == false) {
 		workqueue_enqueue(sc->sc_workq, &sc->sc_work, NULL);
 		sc->sc_queued = true;
 	}
-	intr_disable(sc->sc_intr);
 
-	return 1;
+	return 0;
 }
 
 static void
@@ -608,7 +604,6 @@ tps65950_intr_work(struct work *work, void *v)
 	struct tps65950_softc *sc = v;
 	uint8_t u8;
 
-	/* FIXME implement */
 	aprint_normal_dev(sc->sc_dev, "%s()\n", __func__);
 
 	iic_acquire_bus(sc->sc_i2c, 0);
@@ -650,7 +645,7 @@ tps65950_pih_attach(struct tps65950_softc *sc, int intr)
 
 	/* create the workqueue */
 	error = workqueue_create(&sc->sc_workq, device_xname(sc->sc_dev),
-			tps65950_intr_work, sc, 0, IPL_VM, WQ_MPSAFE);
+			tps65950_intr_work, sc, PRIO_MAX, IPL_VM, 0);
 	if (error) {
 		aprint_error_dev(sc->sc_dev, "couldn't create workqueue\n");
 		return;
@@ -678,6 +673,7 @@ tps65950_bci_attach(struct tps65950_softc *sc)
 static void
 tps65950_bci_intr(struct tps65950_softc *sc)
 {
+#if 0
 	uint8_t u8;
 
 	tps65950_read_1(sc, TPS65950_BCI_REG_BCIISR1A, &u8);
@@ -687,6 +683,7 @@ tps65950_bci_intr(struct tps65950_softc *sc)
 	tps65950_read_1(sc, TPS65950_BCI_REG_BCIISR2A, &u8);
 	/* FIXME really implement */
 	tps65950_write_1(sc, TPS65950_BCI_REG_BCIISR2A, u8);
+#endif
 }
 
 #if NGPIO > 0
@@ -746,7 +743,9 @@ tps65950_gpio_attach(struct tps65950_softc *sc, int intrbase)
 static void
 tps65950_gpio_intr(struct tps65950_softc *sc)
 {
+#if 0
 	pic_handle_intr(&sc->sc_gpio_pic);
+#endif
 }
 
 static int
@@ -929,9 +928,10 @@ tps65950_kbd_attach(struct tps65950_softc *sc)
 			wskbddevprint, NULL);
 }
 
-static int
+static void
 tps65950_kbd_intr(struct tps65950_softc *sc)
 {
+#if 0
 	uint8_t u8;
 	uint8_t code[8];
 	int i;
@@ -975,8 +975,7 @@ tps65950_kbd_intr(struct tps65950_softc *sc)
 
 	/* acknowledge the interrupt */
 	tps65950_write_1(sc, TPS65950_KEYPAD_REG_ISR1, 0xff);
-
-	return 1;
+#endif
 }
 
 static int
@@ -1072,6 +1071,7 @@ tps65950_kbd_cngetc(void *v, u_int *type, int *data)
 static void
 tps65950_kbd_cnpollc(void *v, int on)
 {
+#if 0
 	struct tps65950_softc *sc = v;
 
 	if (on) {
@@ -1079,6 +1079,7 @@ tps65950_kbd_cnpollc(void *v, int on)
 	} else {
 		intr_enable(sc->sc_intr);
 	}
+#endif
 }
 #endif
 
