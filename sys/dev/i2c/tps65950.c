@@ -200,6 +200,11 @@ __KERNEL_RCSID(0, "$NetBSD: tps65950.c,v 1.3 2012/12/31 21:45:36 jmcneill Exp $"
 #define TPS65950_ID3_REG_LED_LEDBPWM	__BIT(5)
 
 /* ID4 */
+#define TPS65950_PM_MASTER		0x36
+#define TPS65950_PM_STS_HW_CONDITIONS	(TPS65950_PM_MASTER + 0x0f)
+#define  TPS65950_PM_STS_HW_CONDITIONS_STS_USB	__BIT(2)
+#define  TPS65950_PM_STS_HW_CONDITIONS_STS_CHG	__BIT(1)
+#define  TPS65950_PM_STS_HW_CONDITIONS_STS_PWON	__BIT(0)
 #define TPS65950_PM_RECEIVER_BASE	0x5b
 #define TPS65950_ID4_REG_WATCHDOG_CFG	(TPS65950_PM_RECEIVER_BASE + 3)
 #define TPS65950_RTC_BASE		0x1c
@@ -250,6 +255,11 @@ static struct workqueue		*tps65950_kbd_workqueue;
 static struct work		tps65950_kbd_workqueue_work;
 static bool			tps65950_kbd_workqueue_available;
 #endif
+
+/* XXX global workqueue to handle PM events on the right address */
+static struct workqueue		*tps65950_pm_workqueue;
+static struct work		tps65950_pm_workqueue_work;
+static bool			tps65950_pm_workqueue_available;
 
 #define PIC_TO_SOFTC(pic) \
 	((struct tps65950_softc *)((char *)(pic) - \
@@ -382,6 +392,11 @@ static const struct wskbd_consops tps65950_kbd_consops = {
 };
 #endif
 
+static void	tps65950_pm_attach(struct tps65950_softc *);
+
+static void	tps65950_pm_intr(struct tps65950_softc *);
+static void	tps65950_pm_intr_work(struct work *, void *);
+
 static void	tps65950_rtc_attach(struct tps65950_softc *);
 static int	tps65950_rtc_enable(struct tps65950_softc *, bool);
 static int	tps65950_rtc_gettime(todr_chip_handle_t, struct clock_ymdhms *);
@@ -468,7 +483,8 @@ tps65950_attach(device_t parent, device_t self, void *aux)
 #endif
 		break;
 	case TPS65950_ADDR_ID4:
-		aprint_normal(": RTC, WATCHDOG\n");
+		aprint_normal(": PM, RTC, WATCHDOG\n");
+		tps65950_pm_attach(sc);
 		tps65950_rtc_attach(sc);
 		tps65950_wdog_attach(sc);
 		break;
@@ -642,9 +658,9 @@ tps65950_intr_work(struct work *work, void *v)
 		tps65950_madc_intr(sc);
 	if (u8 & TPS65950_PIH_REG_ISR_P1_ISR4)
 		tps65950_usb_intr(sc);
+#endif
 	if (u8 & TPS65950_PIH_REG_ISR_P1_ISR5)
 		tps65950_pm_intr(sc);
-#endif
 
 	iic_release_bus(sc->sc_i2c, 0);
 
@@ -1046,12 +1062,18 @@ tps65950_kbd_intr_work(struct work *work, void *v)
 	int data;
 	int s;
 
+	iic_acquire_bus(sc->sc_i2c, 0);
 	tps65950_read_1(sc, TPS65950_KEYPAD_REG_ISR1, &u8);
 	aprint_normal_dev(sc->sc_dev, "%s() %u\n", __func__, u8);
 
 	/* check if there is anything to do */
-	if (u8 == 0)
+	if (u8 == 0) {
+		iic_release_bus(sc->sc_i2c, 0);
+
+		/* allow queueing again */
+		tps65950_kbd_workqueue_available = true;
 		return;
+	}
 
 	/* read the keycodes pressed */
 	for (i = 0; i < sizeof(code); i++) {
@@ -1081,6 +1103,7 @@ tps65950_kbd_intr_work(struct work *work, void *v)
 
 	/* acknowledge the interrupt */
 	tps65950_write_1(sc, TPS65950_KEYPAD_REG_ISR1, 0xff);
+	iic_release_bus(sc->sc_i2c, 0);
 
 	/* allow queueing again */
 	tps65950_kbd_workqueue_available = true;
@@ -1183,6 +1206,50 @@ tps65950_kbd_cnpollc(void *v, int on)
 		iic_release_bus(sc->sc_i2c, 0);
 }
 #endif
+
+static void
+tps65950_pm_attach(struct tps65950_softc *sc)
+{
+	int error;
+
+	/* FIXME implement more (power button...) */
+
+	/* create the workqueue */
+	error = workqueue_create(&tps65950_pm_workqueue,
+			device_xname(sc->sc_dev), tps65950_pm_intr_work, sc,
+			PRIO_MAX, IPL_VM, 0);
+	if (error) {
+		aprint_error_dev(sc->sc_dev, "couldn't create workqueue\n");
+		return;
+	}
+	tps65950_pm_workqueue_available = true;
+}
+
+static void
+tps65950_pm_intr(struct tps65950_softc *sc)
+{
+	if (tps65950_pm_workqueue_available) {
+		workqueue_enqueue(tps65950_pm_workqueue,
+				&tps65950_pm_workqueue_work, NULL);
+		tps65950_pm_workqueue_available = false;
+	}
+}
+
+static void
+tps65950_pm_intr_work(struct work *work, void *v)
+{
+	struct tps65950_softc *sc = v;
+	uint8_t u8;
+
+	iic_acquire_bus(sc->sc_i2c, 0);
+	tps65950_read_1(sc, TPS65950_PM_STS_HW_CONDITIONS, &u8);
+	if (u8 & TPS65950_PM_STS_HW_CONDITIONS_STS_PWON)
+		/* FIXME really implement */
+		aprint_normal_dev(sc->sc_dev, "%s()\n", __func__);
+	iic_release_bus(sc->sc_i2c, 0);
+
+	tps65950_pm_workqueue_available = true;
+}
 
 static void
 tps65950_rtc_attach(struct tps65950_softc *sc)
