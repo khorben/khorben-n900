@@ -44,3 +44,8 @@ file	arch/evbarm/n900/n900_kbdsld.c	n900kbdsld
 device n900lckbtn: sysmon_envsys
 attach n900lckbtn at gpio with n900lckbtn
 file	arch/evbarm/n900/n900_lckbtn.c		n900lckbtn
+
+# Proximity sensor
+device n900prxmty: sysmon_envsys
+attach n900prxmty at gpio with n900prxmty
+file	arch/evbarm/n900/n900_prxmty.c		n900prxmty
