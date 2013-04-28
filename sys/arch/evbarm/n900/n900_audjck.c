@@ -64,6 +64,7 @@ struct n900audjck_softc
 	int			sc_map_pins[N900AUDJCK_NPINS];
 
 	struct sysmon_pswitch	sc_smpsw;
+	int			sc_state;
 };
 
 static int	n900audjck_match(device_t, cfdata_t, void *);
@@ -145,8 +146,10 @@ n900audjck_attach(device_t parent, device_t self, void *aux)
 
 	sc->sc_smpsw.smpsw_name = device_xname(self);
 	sc->sc_smpsw.smpsw_type = PSWITCH_TYPE_HOTKEY;
+	sc->sc_state = PSWITCH_EVENT_RELEASED;
 	sysmon_pswitch_register(&sc->sc_smpsw);
 
+	/* report an event immediately if an audio jack is inserted */
 	n900audjck_refresh(sc);
 }
 
@@ -184,10 +187,15 @@ n900audjck_refresh(struct n900audjck_softc *sc)
 	event = (i == GPIO_PIN_HIGH)
 		? PSWITCH_EVENT_RELEASED : PSWITCH_EVENT_PRESSED;
 
+	/* crude way to avoid duplicate events */
+	if(event == sc->sc_state)
+		return;
+	sc->sc_state = event;
+
 	/* report the event */
 #if 1
 	aprint_error_dev(sc->sc_dev, "%s\n", (i == GPIO_PIN_HIGH)
-			? "opened" : "covered");
+			? "removed" : "inserted");
 #endif
 	sysmon_pswitch_event(&sc->sc_smpsw, event);
 }
