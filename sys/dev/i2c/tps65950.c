@@ -226,25 +226,29 @@ struct tps65950_softc {
 
 	struct sysctllog	*sc_sysctllog;
 
-	/* pih */
+	/* PIH */
 	void			*sc_intr;
 	struct workqueue	*sc_workq;
 	struct work		sc_work;
 	bool			sc_queued;
 
 #if NGPIO > 0
-	/* gpio */
+	/* GPIO */
 	struct gpio_chipset_tag	sc_gpio;
 	gpio_pin_t		sc_gpio_pins[18];
 	struct pic_softc	sc_gpio_pic;
 #endif /* NGPIO > 0 */
 
 #if defined(OMAP_3430)
-	/* keypad */
+	/* KEYPAD */
 	device_t		sc_wskbddev;
 	uint8_t			sc_keycodes[8];
 #endif
 
+	/* PM */
+	struct sysmon_pswitch	sc_pm_psw;
+
+	/* WATCHDOG */
 	struct sysmon_wdog	sc_smw;
 	struct todr_chip_handle	sc_todr;
 };
@@ -1212,7 +1216,10 @@ tps65950_pm_attach(struct tps65950_softc *sc)
 {
 	int error;
 
-	/* FIXME implement more (power button...) */
+	/* register the power button */
+	sc->sc_pm_psw.smpsw_name = device_xname(sc->sc_dev); /* XXX */
+	sc->sc_pm_psw.smpsw_type = PSWITCH_TYPE_ACADAPTER;
+	sysmon_pswitch_register(&sc->sc_pm_psw);
 
 	/* create the workqueue */
 	error = workqueue_create(&tps65950_pm_workqueue,
@@ -1243,9 +1250,10 @@ tps65950_pm_intr_work(struct work *work, void *v)
 
 	iic_acquire_bus(sc->sc_i2c, 0);
 	tps65950_read_1(sc, TPS65950_PM_STS_HW_CONDITIONS, &u8);
-	if (u8 & TPS65950_PM_STS_HW_CONDITIONS_STS_PWON)
-		/* FIXME really implement */
-		aprint_normal_dev(sc->sc_dev, "%s()\n", __func__);
+	if (u8 & TPS65950_PM_STS_HW_CONDITIONS_STS_PWON) {
+		sysmon_pswitch_event(&sc->sc_pm_psw, PSWITCH_EVENT_PRESSED);
+		sysmon_pswitch_event(&sc->sc_pm_psw, PSWITCH_EVENT_RELEASED);
+	}
 	iic_release_bus(sc->sc_i2c, 0);
 
 	tps65950_pm_workqueue_available = true;
