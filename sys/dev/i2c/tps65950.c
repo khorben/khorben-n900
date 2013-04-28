@@ -246,9 +246,9 @@ struct tps65950_softc {
 
 #if defined(OMAP_3430)
 /* XXX global workqueue to handle keyboard events on the right address */
-static struct workqueue		*kbd_workqueue;
-static struct work		kbd_workqueue_work;
-static bool			kbd_workqueue_available;
+static struct workqueue		*tps65950_kbd_workqueue;
+static struct work		tps65950_kbd_workqueue_work;
+static bool			tps65950_kbd_workqueue_available;
 #endif
 
 #define PIC_TO_SOFTC(pic) \
@@ -1014,21 +1014,23 @@ tps65950_kbd_attach(struct tps65950_softc *sc)
 			wskbddevprint, NULL);
 
 	/* create the workqueue */
-	error = workqueue_create(&kbd_workqueue, device_xname(sc->sc_dev),
-			tps65950_kbd_intr_work, sc, PRIO_MAX, IPL_VM, 0);
+	error = workqueue_create(&tps65950_kbd_workqueue,
+			device_xname(sc->sc_dev), tps65950_kbd_intr_work, sc,
+			PRIO_MAX, IPL_VM, 0);
 	if (error) {
 		aprint_error_dev(sc->sc_dev, "couldn't create workqueue\n");
 		return;
 	}
-	kbd_workqueue_available = true;
+	tps65950_kbd_workqueue_available = true;
 }
 
 static void
 tps65950_kbd_intr(struct tps65950_softc *sc)
 {
-	if (kbd_workqueue_available) {
-		workqueue_enqueue(kbd_workqueue, &kbd_workqueue_work, NULL);
-		kbd_workqueue_available = false;
+	if (tps65950_kbd_workqueue_available) {
+		workqueue_enqueue(tps65950_kbd_workqueue,
+				&tps65950_kbd_workqueue_work, NULL);
+		tps65950_kbd_workqueue_available = false;
 	}
 }
 
@@ -1081,7 +1083,7 @@ tps65950_kbd_intr_work(struct work *work, void *v)
 	tps65950_write_1(sc, TPS65950_KEYPAD_REG_ISR1, 0xff);
 
 	/* allow queueing again */
-	kbd_workqueue_available = true;
+	tps65950_kbd_workqueue_available = true;
 }
 
 static int
