@@ -260,6 +260,11 @@ static struct work		tps65950_kbd_workqueue_work;
 static bool			tps65950_kbd_workqueue_available;
 #endif
 
+/* XXX global workqueue to re-enable interrupts once handled */
+static struct workqueue		*tps65950_pih_workqueue;
+static struct work		tps65950_pih_workqueue_work;
+static bool			tps65950_pih_workqueue_available;
+
 /* XXX global workqueue to handle PM events on the right address */
 static struct workqueue		*tps65950_pm_workqueue;
 static struct work		tps65950_pm_workqueue_work;
@@ -281,6 +286,7 @@ static int	tps65950_intr(void *);
 static void	tps65950_intr_work(struct work *, void *);
 
 static void	tps65950_pih_attach(struct tps65950_softc *, int);
+static void	tps65950_pih_intr_work(struct work *, void *);
 
 static void	tps65950_bci_attach(struct tps65950_softc *);
 
@@ -620,8 +626,10 @@ tps65950_intr(void *v)
 {
 	struct tps65950_softc *sc = v;
 
+#if 0
 	aprint_normal_dev(sc->sc_dev, "%s() %p %u\n", __func__, sc->sc_intr,
 			sc->sc_queued);
+#endif
 	if (sc->sc_queued == false) {
 		workqueue_enqueue(sc->sc_workq, &sc->sc_work, NULL);
 		sc->sc_queued = true;
@@ -637,13 +645,17 @@ tps65950_intr_work(struct work *work, void *v)
 	struct tps65950_softc *sc = v;
 	uint8_t u8;
 
+#if 0
 	aprint_normal_dev(sc->sc_dev, "%s()\n", __func__);
+#endif
 
 	iic_acquire_bus(sc->sc_i2c, 0);
 
 	/* acknowledge the interrupt */
 	tps65950_read_1(sc, TPS65950_PIH_REG_ISR_P1, &u8);
+#if 0
 	aprint_normal_dev(sc->sc_dev, "%s() u8=%u\n", __func__, u8);
+#endif
 	tps65950_write_1(sc, TPS65950_PIH_REG_ISR_P1, u8);
 
 	/* dispatch the interrupt */
@@ -668,9 +680,18 @@ tps65950_intr_work(struct work *work, void *v)
 
 	iic_release_bus(sc->sc_i2c, 0);
 
-	/* re-enable the interrupt */
+	/* allow the workqueue to be entered again */
 	sc->sc_queued = false;
+#if 0
 	intr_enable(sc->sc_intr);
+#endif
+
+	/* restore the main interrupt handler */
+	if (tps65950_pih_workqueue_available) {
+		tps65950_pih_workqueue_available = false;
+		workqueue_enqueue(tps65950_pih_workqueue,
+				&tps65950_pih_workqueue_work, NULL);
+	}
 }
 
 static void
@@ -678,7 +699,7 @@ tps65950_pih_attach(struct tps65950_softc *sc, int intr)
 {
 	int error;
 
-	/* create the workqueue */
+	/* create the workqueues */
 	error = workqueue_create(&sc->sc_workq, device_xname(sc->sc_dev),
 			tps65950_intr_work, sc, PRIO_MAX, IPL_VM, 0);
 	if (error) {
@@ -687,12 +708,33 @@ tps65950_pih_attach(struct tps65950_softc *sc, int intr)
 	}
 	sc->sc_queued = false;
 
+	error = workqueue_create(&tps65950_pih_workqueue,
+			device_xname(sc->sc_dev), tps65950_pih_intr_work, sc,
+			PRIO_MAX, IPL_HIGH, 0);
+	if (error) {
+		aprint_error_dev(sc->sc_dev, "couldn't create workqueue\n");
+		return;
+	}
+	tps65950_pih_workqueue_available = true;
+
 	/* establish the interrupt handler */
 	sc->sc_intr = intr_establish(intr, IPL_VM, IST_LEVEL, tps65950_intr,
 			sc);
 	if (sc->sc_intr == NULL) {
 		aprint_error_dev(sc->sc_dev, "couldn't establish interrupt\n");
 	}
+}
+
+static void
+tps65950_pih_intr_work(struct work *work, void *v)
+{
+	struct tps65950_softc *sc = v;
+
+#if 0
+	aprint_normal_dev(sc->sc_dev, "%s()\n", __func__);
+#endif
+	tps65950_pih_workqueue_available = true;
+	intr_enable(sc->sc_intr);
 }
 
 static void
@@ -1047,6 +1089,10 @@ tps65950_kbd_attach(struct tps65950_softc *sc)
 static void
 tps65950_kbd_intr(struct tps65950_softc *sc)
 {
+#if 0
+	aprint_normal_dev(sc->sc_dev, "%s() %u\n", __func__,
+			tps65950_kbd_workqueue_available);
+#endif
 	if (tps65950_kbd_workqueue_available) {
 		workqueue_enqueue(tps65950_kbd_workqueue,
 				&tps65950_kbd_workqueue_work, NULL);
@@ -1068,7 +1114,9 @@ tps65950_kbd_intr_work(struct work *work, void *v)
 
 	iic_acquire_bus(sc->sc_i2c, 0);
 	tps65950_read_1(sc, TPS65950_KEYPAD_REG_ISR1, &u8);
+#if 0
 	aprint_normal_dev(sc->sc_dev, "%s() %u\n", __func__, u8);
+#endif
 
 	/* check if there is anything to do */
 	if (u8 == 0) {
@@ -1101,6 +1149,15 @@ tps65950_kbd_intr_work(struct work *work, void *v)
 			s = spltty();
 			wskbd_input(sc->sc_wskbddev, type, data);
 			splx(s);
+#if 1 /* XXX ugly hack */
+			if (type == WSCONS_EVENT_KEY_DOWN)
+			{
+				type = WSCONS_EVENT_KEY_UP;
+				s = spltty();
+				wskbd_input(sc->sc_wskbddev, type, data);
+				splx(s);
+			}
+#endif
 		}
 		sc->sc_keycodes[i] = code[i];
 	}
