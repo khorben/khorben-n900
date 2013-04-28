@@ -182,12 +182,12 @@ n900prxmty_refresh(struct n900prxmty_softc *sc)
 
 	i = gpio_pin_read(sc->sc_gpio, &sc->sc_map, N900PRXMTY_PIN_INPUT);
 	event = (i == GPIO_PIN_HIGH)
-		? PSWITCH_EVENT_RELEASED : PSWITCH_EVENT_PRESSED;
+		? PSWITCH_EVENT_PRESSED : PSWITCH_EVENT_RELEASED;
 
 	/* report the event */
 #if 1
 	aprint_error_dev(sc->sc_dev, "%s\n", (i == GPIO_PIN_HIGH)
-			? "opened" : "covered");
+			? "covered" : "opened");
 #endif
 	sysmon_pswitch_event(&sc->sc_smpsw, event);
 }
