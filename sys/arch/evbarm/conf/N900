@@ -233,6 +233,9 @@ n900camcvr0	at gpio3 offset 14 mask 0x1 #intr 206
 # Lock button
 n900lckbtn0	at gpio3 offset 17 mask 0x1 #intr 209
 
+# Audio jack
+n900audjck0	at gpio5 offset 17 mask 0x1 #intr 273
+
 # System Control Module
 omapscm0 	at obio0 addr 0x48002000 size 0x1000
 

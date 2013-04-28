@@ -20,6 +20,11 @@ attach com at obio with obiouart
 file	arch/arm/omap/obio_com.c		obiouart
 defparam opt_com.h				CONSADDR CONSPEED CONMODE
 
+# Audio jack
+device n900audjck: sysmon_envsys
+attach n900audjck at gpio with n900audjck
+file	arch/evbarm/n900/n900_audjck.c		n900audjck
+
 # Camera button
 device n900cambtn: sysmon_envsys
 attach n900cambtn at gpio with n900cambtn
