@@ -48,7 +48,7 @@ __KERNEL_RCSID(0, "$NetBSD: n900_prxmty.c,v 1.1 2013/04/20 03:37:55 khorben Exp 
 /* The base interrupt for the corresponding GPIO device where this driver
  * attaches. This is an ugly workaround the current limitations of gpio(4),
  * which does not seem to allow a better way to locate the interrupt yet. */
-#define N900PRXMTY_GPIO_BASE	185
+#define N900PRXMTY_GPIO_BASE	160
 
 #define N900PRXMTY_PIN_INPUT	0
 #define N900PRXMTY_NPINS	1
