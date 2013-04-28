@@ -1,7 +1,7 @@
 /*	$NetBSD$ */
 
 /*
- * Proxumity sensor driver for the Nokia N900.
+ * Proximity sensor driver for the Nokia N900.
  *
  * Copyright (c) 2013 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -147,7 +147,6 @@ n900prxmty_attach(device_t parent, device_t self, void *aux)
 	sc->sc_smpsw.smpsw_type = PSWITCH_TYPE_HOTKEY;
 	sysmon_pswitch_register(&sc->sc_smpsw);
 
-	/* FIXME report an event only if opened instead */
 	n900prxmty_refresh(sc);
 }
 
