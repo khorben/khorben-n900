@@ -1270,7 +1270,7 @@ tps65950_pm_attach(struct tps65950_softc *sc)
 
 	/* register the power button */
 	sc->sc_pm_psw.smpsw_name = device_xname(sc->sc_dev); /* XXX */
-	sc->sc_pm_psw.smpsw_type = PSWITCH_TYPE_ACADAPTER;
+	sc->sc_pm_psw.smpsw_type = PSWITCH_TYPE_POWER;
 	sysmon_pswitch_register(&sc->sc_pm_psw);
 
 	/* create the workqueue */
