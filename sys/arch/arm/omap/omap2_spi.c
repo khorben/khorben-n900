@@ -487,7 +487,7 @@ omap2_spi_send(struct omap2_spi_softc * const sc, int channel)
 		}
 	}
 
-	if (chunk->chunk_wresid-- == 0) {
+	if (--chunk->chunk_wresid == 0) {
 		sc->sc_channels[channel].wchunk
 			= sc->sc_channels[channel].wchunk->chunk_next;
 	}
@@ -514,7 +514,7 @@ omap2_spi_recv(struct omap2_spi_softc * const sc, int channel)
 		}
 	}
 
-	if (chunk->chunk_rresid-- == 0) {
+	if (--chunk->chunk_rresid == 0) {
 		sc->sc_channels[channel].rchunk
 			= sc->sc_channels[channel].rchunk->chunk_next;
 	}
