@@ -176,7 +176,7 @@ omap2_spi_attach(device_t parent, device_t self, void *opaque)
 
 	/* initialize the channels */
 	for (i = 0; i < nslaves; i++) {
-		SIMPLEQ_INIT(&sc->sc_channels[i].queue);
+		spi_transq_init(&sc->sc_channels[i].queue);
 	}
 
 	sba.sba_controller = &sc->sc_spi;
