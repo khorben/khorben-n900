@@ -179,8 +179,8 @@ omap2_spi_attach(device_t parent, device_t self, void *opaque)
 		spi_transq_init(&sc->sc_channels[i].queue);
 	}
 
+	/* initialize and attach the SPI bus */
 	sba.sba_controller = &sc->sc_spi;
-
 	config_found_ia(self, "spibus", &sba, spibus_print);
 }
 
@@ -400,11 +400,14 @@ omap2_spi_intr(void *v)
 				break;
 		}
 
-		if (tx_empty && chan->wchunk != NULL) {
-			omap2_spi_send(sc, i);
+		if (chan->wchunk != NULL) {
+			if (tx_empty) {
+				omap2_spi_send(sc, i);
+				if (chan->wchunk == NULL)
+					omap2_spi_recv(sc, i);
+			}
 		}
-
-		if (rx_full) {
+		else if (rx_full) {
 			omap2_spi_recv(sc, i);
 		}
 
@@ -501,17 +504,20 @@ omap2_spi_recv(struct omap2_spi_softc * const sc, int channel)
 	uint32_t u32;
 	uint32_t data;
 
-	if ((chunk = sc->sc_channels[channel].rchunk) == NULL)
+	while ((chunk = sc->sc_channels[channel].rchunk) != NULL
+			&& chunk->chunk_rresid == 0) {
+		sc->sc_channels[channel].rchunk = chunk->chunk_next;
+	}
+
+	if (chunk == NULL)
 		return;
 
-	if (chunk->chunk_rresid) {
-		u32 = SPI_READ_REG(sc, stat);
-		if ((u32 & OMAP2_MCSPI_CHXSTAT_RXS) == 0)
-			return;
-		data = SPI_READ_REG(sc, OMAP2_MCSPI_RX(channel));
-		if (chunk->chunk_rptr) {
-			*chunk->chunk_rptr++ = data & 0xff;
-		}
+	u32 = SPI_READ_REG(sc, stat);
+	if ((u32 & OMAP2_MCSPI_CHXSTAT_RXS) == 0)
+		return;
+	data = SPI_READ_REG(sc, OMAP2_MCSPI_RX(channel));
+	if (chunk->chunk_rptr) {
+		*chunk->chunk_rptr++ = data & 0xff;
 	}
 
 	if (--chunk->chunk_rresid == 0) {
