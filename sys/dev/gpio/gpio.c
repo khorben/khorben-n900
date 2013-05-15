@@ -1,4 +1,4 @@
-/* $NetBSD: gpio.c,v 1.51 2012/10/17 21:35:39 dyoung Exp $ */
+/* $NetBSD: gpio.c,v 1.51.6.1 2013/05/10 01:20:04 khorben Exp $ */
 /*	$OpenBSD: gpio.c,v 1.6 2006/01/14 12:33:49 grange Exp $	*/
 
 /*
@@ -19,7 +19,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: gpio.c,v 1.51 2012/10/17 21:35:39 dyoung Exp $");
+__KERNEL_RCSID(0, "$NetBSD: gpio.c,v 1.51.6.1 2013/05/10 01:20:04 khorben Exp $");
 
 /*
  * General Purpose Input/Output framework.
