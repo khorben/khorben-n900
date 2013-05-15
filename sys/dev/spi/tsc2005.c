@@ -110,7 +110,8 @@ tsc2005_match(device_t parent, cfdata_t match, void *aux)
 {
 	struct spi_attach_args *sa = aux;
 
-	spi_configure(sa->sa_handle, SPI_MODE_0, 6000000);
+	if (spi_configure(sa->sa_handle, SPI_MODE_0, sa->sa_speed) != 0)
+		return 0;
 	return 1;
 }
 
