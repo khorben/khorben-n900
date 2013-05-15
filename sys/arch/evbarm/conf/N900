@@ -271,8 +271,8 @@ omapspi3	at obio0 addr 0x480ba000 size 0x1000 intr 48
 spi*		at omapspi?
 
 # Touchscreen
-#tsc2005ts0	at spi0 slave 0 intr 196
-#wsmouse*	at tsc2005ts? mux 0
+tsc2005ts0	at spi0 slave 0 speed 6000000 intr 196
+wsmouse*	at tsc2005ts? mux 0
 
 # Wireless interface
 #wilink0	at spi3 slave 0 intr 138 #298? 202?
