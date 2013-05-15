@@ -260,6 +260,9 @@ gpio*		at tps65950pm1
 # Integrated keyboard
 wskbd*		at tps65950pm2 mux 1
 
+# LED driver
+lp5523led0	at iic1 addr 0x32
+
 # Accelerometer
 #stmemsis0	at iic2 addr 0x1d intr 277
 
