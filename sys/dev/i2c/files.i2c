@@ -1,4 +1,4 @@
-#	$NetBSD: files.i2c,v 1.47 2012/12/31 19:47:27 jmcneill Exp $
+#	$NetBSD: files.i2c,v 1.49.2.3 2013/05/12 01:49:44 khorben Exp $
 
 obsolete defflag	opt_i2cbus.h		I2C_SCAN
 define	i2cbus { }
@@ -176,6 +176,16 @@ file	dev/i2c/ibmhawk.c		ibmhawk
 device	tps65950pm: gpiobus, sysmon_wdog, wskbddev
 attach	tps65950pm at iic
 file	dev/i2c/tps65950.c		tps65950pm
+
+# TI TPS65217
+device	tps65217pmic: sysmon_envsys
+attach	tps65217pmic at iic
+file	dev/i2c/tps65217pmic.c 		tps65217pmic
+
+# Microchip MCP980x
+device	mcp980x: sysmon_envsys
+attach	mcp980x at iic
+file	dev/i2c/mcp980x.c 		mcp980x
 
 # ST MEMS inertial sensors (accelerometers)
 device	stmemsis: sysmon_envsys
