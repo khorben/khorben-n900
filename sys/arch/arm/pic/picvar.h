@@ -1,4 +1,4 @@
-/*	$NetBSD: picvar.h,v 1.7 2012/09/01 00:00:42 matt Exp $	*/
+/*	$NetBSD: picvar.h,v 1.7.8.1 2013/05/10 00:57:56 khorben Exp $	*/
 /*-
  * Copyright (c) 2008 The NetBSD Foundation, Inc.
  * All rights reserved.

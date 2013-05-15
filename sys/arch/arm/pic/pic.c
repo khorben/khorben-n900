@@ -1,4 +1,4 @@
-/*	$NetBSD: pic.c,v 1.15 2012/10/30 07:42:35 msaitoh Exp $	*/
+/*	$NetBSD: pic.c,v 1.15.6.1 2013/05/10 00:57:56 khorben Exp $	*/
 /*-
  * Copyright (c) 2008 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -28,7 +28,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pic.c,v 1.15 2012/10/30 07:42:35 msaitoh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pic.c,v 1.15.6.1 2013/05/10 00:57:56 khorben Exp $");
 
 #define _INTR_PRIVATE
 #include <sys/param.h>
