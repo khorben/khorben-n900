@@ -181,3 +181,8 @@ file	dev/i2c/tps65950.c		tps65950pm
 device	stmemsis: sysmon_envsys
 attach	stmemsis at iic
 file	dev/i2c/stmemsis.c		stmemsis
+
+# TI LP5523 LED driver
+device	lp5523led: sysmon_envsys
+attach	lp5523led at iic
+file	dev/i2c/lp5523.c		lp5523led
