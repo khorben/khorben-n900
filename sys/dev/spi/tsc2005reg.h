@@ -34,6 +34,16 @@
  * - 2005
  */
 
+#define TSC2005_CTL		0x80
+#define  TSC2005_CTL_RM		__BIT(2)
+#define  TSC2005_CTL_SWRST	__BIT(1)
+#define  TSC2005_CTL_STS	__BIT(0)
+
+#define TSC2005_CMD		0x00
+#define  TSC2005_CMD_READ_REG	0x01
+#define  TSC2005_CMD_WRITE_REG	0x00
+#define  TSC2005_CMD_ADDR_SHIFT	3
+
 #define TSC2005_REG_X		0x00
 #define TSC2005_REG_Y		0x01
 #define TSC2005_REG_Z1		0x02

@@ -52,9 +52,11 @@ enum tsc2005_sensors {
 #define TSC2005_SENSOR_LAST	TSC2005_SENSOR_TEMP2
 #define TSC2005_SENSOR_COUNT	(TSC2005_SENSOR_LAST + 1)
 
+#if 1
 static const char const * tsc2005_sensors_names[TSC2005_SENSOR_COUNT] = {
 	"temp1", "temp2"
 };
+#endif
 
 /* variables */
 struct tsc2005_softc {
@@ -83,7 +85,7 @@ static int	tsc2005_reset(struct tsc2005_softc *);
 
 static int	tsc2005_intr(void *);
 
-static void	tsc2005_work(struct work *, void *);
+static void	tsc2005_intr_work(struct work *, void *);
 
 static int	tsc2005_read_reg(struct tsc2005_softc *, int, uint16_t *);
 #if 0
@@ -117,8 +119,10 @@ tsc2005_attach(device_t parent, device_t self, void *aux)
 {
 	struct tsc2005_softc *sc = device_private(self);
 	struct spi_attach_args *sa = aux;
+#if 1
 	struct wsmousedev_attach_args a;
 	int i;
+#endif
 	int error;
 
 	sc->sc_dev = self;
@@ -127,11 +131,11 @@ tsc2005_attach(device_t parent, device_t self, void *aux)
 	aprint_normal(": TSC2005 touchscreen\n");
 	aprint_naive(": TSC2005 touchscreen\n");
 
-#if 1
+#if 0
 	tsc2005_reset(sc);
 #endif
 
-#if 0
+#if 1
 	sc->sc_intr = intr_establish(sa->sa_intr, IPL_BIO, IST_LEVEL_LOW,
 			tsc2005_intr, sc);
 #else
@@ -143,19 +147,21 @@ tsc2005_attach(device_t parent, device_t self, void *aux)
 	}
 
 	error = workqueue_create(&sc->sc_workq, device_xname(sc->sc_dev),
-			tsc2005_work, sc, (PRI_USER + MAXPRI_USER) / 2,
-			IPL_BIO, 0);
+			tsc2005_intr_work, sc, PRIO_MAX, IPL_BIO, 0);
 	if (error) {
 		aprint_error_dev(sc->sc_dev, "couldn't create workqueue\n");
 	}
 	sc->sc_queued = false;
 
+#if 1
 	/* attach wsmouse */
 	a.accessops = &tsc2005_accessops;
 	a.accesscookie = sc;
 	sc->sc_wsmousedev = config_found(self, &a, wsmousedevprint);
 	sc->sc_wsenabled = false;
+#endif
 
+#if 1
 	/* initialize the sensors */
 	sc->sc_sme = sysmon_envsys_create();
 	for (i = 0; i < TSC2005_SENSOR_COUNT; i++) {
@@ -189,6 +195,7 @@ tsc2005_attach(device_t parent, device_t self, void *aux)
 			sc->sc_sme = NULL;
 		}
 	}
+#endif
 
 	if (!pmf_device_register(sc->sc_dev, NULL, NULL)) {
 		aprint_error_dev(sc->sc_dev,
@@ -223,14 +230,12 @@ tsc2005_reset(struct tsc2005_softc *sc)
 {
 	uint8_t u8;
 
-	aprint_normal_dev(sc->sc_dev, "%s()\n", __func__);
-
 	/* send a Control Byte 1 with the SWRST bit set */
-	u8 = 0x82;
+	u8 = TSC2005_CTL | TSC2005_CTL_SWRST;
 	spi_send(sc->sc_spi, sizeof(u8), &u8);
 
 	/* send a Control Byte 1 with the SWRST bit unset */
-	u8 = 0x80;
+	u8 = TSC2005_CTL;
 	spi_send(sc->sc_spi, sizeof(u8), &u8);
 	return 0;
 }
@@ -240,24 +245,16 @@ tsc2005_intr(void *v)
 {
 	struct tsc2005_softc *sc = v;
 
-	aprint_normal_dev(sc->sc_dev, "%s\n", __func__);
-
-#if 1
-	if (0)
-		tsc2005_reset(sc);
-#endif
-
 	if (!sc->sc_queued) {
-		aprint_normal_dev(sc->sc_dev, "%s queueing\n", __func__);
 		workqueue_enqueue(sc->sc_workq, &sc->sc_work, NULL);
 		sc->sc_queued = true;
 	}
 
-	return 1;
+	return 0;
 }
 
 static void
-tsc2005_work(struct work *wk, void *arg)
+tsc2005_intr_work(struct work *wk, void *arg)
 {
 	struct tsc2005_softc *sc = arg;
 	uint16_t status;
@@ -269,13 +266,25 @@ tsc2005_work(struct work *wk, void *arg)
 	int flags = WSMOUSE_INPUT_ABSOLUTE_X | WSMOUSE_INPUT_ABSOLUTE_Y;
 	int s;
 #endif
+#if 1
+	static int reset = 0;
 
-	aprint_normal_dev(sc->sc_dev, "%s\n", __func__);
-	tsc2005_read_reg(sc, TSC2005_REG_STATUS, &status);
-	aprint_normal_dev(sc->sc_dev, "status: 0x%02x\n", status);
-
-	if (!sc->sc_wsenabled)
+	if (reset == 0) {
+		tsc2005_reset(sc);
+		reset = 1;
+		sc->sc_queued = false;
+		intr_enable(sc->sc_intr);
 		return;
+	}
+#endif
+
+	tsc2005_read_reg(sc, TSC2005_REG_STATUS, &status);
+
+	if (!sc->sc_wsenabled) {
+		sc->sc_queued = false;
+		intr_enable(sc->sc_intr);
+		return;
+	}
 
 #if 1
 	tsc2005_read_reg(sc, TSC2005_REG_X, &x);
@@ -290,6 +299,7 @@ tsc2005_work(struct work *wk, void *arg)
 #endif
 
 	sc->sc_queued = false;
+	intr_enable(sc->sc_intr);
 }
 
 static int
@@ -297,10 +307,10 @@ tsc2005_read_reg(struct tsc2005_softc *sc, int reg, uint16_t *data)
 {
 	uint8_t buf[2];
 
-	aprint_normal_dev(sc->sc_dev, "%s\n", __func__);
-	buf[0] = reg << 3 | 1;
-	spi_send_recv(sc->sc_spi, sizeof(buf), buf, sizeof(buf), buf);
-	*data = (buf[1] << 8) | buf[0];
+	buf[0] = TSC2005_CMD | TSC2005_CMD_READ_REG
+		| (reg << TSC2005_CMD_ADDR_SHIFT);
+	spi_send_recv(sc->sc_spi, sizeof(buf[0]), &buf[0], sizeof(buf), buf);
+	*data = (buf[0] << 8) | buf[1];
 	return 0;
 }
 
@@ -310,9 +320,10 @@ tsc2005_write_reg(struct tsc2005_softc *sc, int reg, uint16_t data)
 {
 	uint8_t buf[3];
 
-	aprint_normal_dev(sc->sc_dev, "%s\n", __func__);
-	buf[0] = reg << 3;
-	memcpy(&buf[1], &data, sizeof(data));
+	buf[0] = TSC2005_CMD | TSC2005_CMD_WRITE_REG
+		| (reg << TSC2005_CMD_ADDR_SHIFT);
+	buf[1] = (data >> 8) & 0xff;
+	buf[2] = data & 0xff;
 	return spi_send(sc->sc_spi, sizeof(buf), buf);
 }
 #endif
