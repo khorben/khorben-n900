@@ -63,14 +63,15 @@ struct lp5523_softc {
 	i2c_tag_t		sc_i2c;
 	i2c_addr_t		sc_addr;
 
-	struct sysctllog *sc_sysctllog;
+	struct sysctllog	*sc_sysctllog;
 };
 
 static int	lp5523_match(device_t, cfdata_t, void *);
 static void	lp5523_attach(device_t, device_t, void *);
-static int	lp5523_detach(device_t, int);
 
 static int	lp5523_reset(struct lp5523_softc *);
+
+static int	lp5523_sysctl(SYSCTLFN_ARGS);
 
 #if 0
 static int	lp5523_read_1(struct lp5523_softc *, uint8_t, uint8_t *);
@@ -78,7 +79,7 @@ static int	lp5523_write_1(struct lp5523_softc *, uint8_t, uint8_t);
 #endif
 
 CFATTACH_DECL_NEW(lp5523led, sizeof(struct lp5523_softc),
-	lp5523_match, lp5523_attach, lp5523_detach, NULL);
+	lp5523_match, lp5523_attach, NULL, NULL);
 
 static int
 lp5523_match(device_t parent, cfdata_t match, void *aux)
@@ -91,6 +92,11 @@ lp5523_attach(device_t parent, device_t self, void *aux)
 {
 	struct lp5523_softc *sc = device_private(self);
 	struct i2c_attach_args *ia = aux;
+	struct sysctllog **log = &sc->sc_sysctllog;
+	const struct sysctlnode *rnode, *cnode;
+	unsigned int i;
+	char buf[8];
+	int error;
 
 	sc->sc_dev = self;
 	sc->sc_i2c = ia->ia_tag;
@@ -101,7 +107,29 @@ lp5523_attach(device_t parent, device_t self, void *aux)
 	aprint_normal(": LED driver\n");
 	aprint_naive(": LED driver\n");
 
-	/* FIXME implement */
+	error = sysctl_createv(log, 0, NULL, &rnode, CTLFLAG_PERMANENT,
+			CTLTYPE_NODE, "hw", NULL, NULL, 0, NULL, 0, CTL_HW,
+			CTL_EOL);
+	if (error)
+		return;
+
+	error = sysctl_createv(log, 0, &rnode, &rnode, CTLFLAG_PERMANENT,
+			CTLTYPE_NODE, sc->sc_dev->dv_xname,
+			SYSCTL_DESCR("lp5523 control"), NULL, 0, NULL, 0,
+			CTL_CREATE, CTL_EOL);
+	if (error)
+		return;
+
+	for (i = 0; i < LP5523_LED_CNT; i++) {
+		snprintf(buf, sizeof(buf), "led%u", i);
+		error = sysctl_createv(log, 0, &rnode, &cnode,
+				CTLFLAG_PERMANENT | CTLFLAG_READWRITE,
+				CTLTYPE_INT, buf, "LED enable",
+				lp5523_sysctl, 0, (void *)sc, CTL_CREATE,
+				CTL_EOL);
+		if (error)
+			break;
+	}
 
 	if (!pmf_device_register(sc->sc_dev, NULL, NULL)) {
 		aprint_error_dev(sc->sc_dev,
@@ -110,18 +138,38 @@ lp5523_attach(device_t parent, device_t self, void *aux)
 }
 
 static int
-lp5523_detach(device_t self, int flags)
-{
-	pmf_device_deregister(self);
-
-	return 0;
-}
-
-static int
 lp5523_reset(struct lp5523_softc *sc)
 {
 	/* FIXME implement */
 	return 0;
+}
+
+static int
+lp5523_sysctl(SYSCTLFN_ARGS)
+{
+	struct lp5523_softc *sc;
+	struct sysctlnode node;
+	u_int led;
+	int error;
+
+	node = *rnode;
+	sc = node.sysctl_data;
+	iic_acquire_bus(sc->sc_i2c, 0);
+	/* FIXME really implement */
+	led = 0;
+	iic_release_bus(sc->sc_i2c, 0);
+
+	node.sysctl_data = &led;
+	error = sysctl_lookup(SYSCTLFN_CALL(&node));
+	if (error || newp == NULL)
+		return error;
+
+	iic_acquire_bus(sc->sc_i2c, 0);
+	/* FIXME really implement */
+	error = 0;
+	iic_release_bus(sc->sc_i2c, 0);
+
+	return error;
 }
 
 #if 0
