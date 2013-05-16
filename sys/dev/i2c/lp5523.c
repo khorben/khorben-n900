@@ -115,7 +115,7 @@ lp5523_attach(device_t parent, device_t self, void *aux)
 
 	error = sysctl_createv(log, 0, &rnode, &rnode, CTLFLAG_PERMANENT,
 			CTLTYPE_NODE, sc->sc_dev->dv_xname,
-			SYSCTL_DESCR("lp5523 control"), NULL, 0, NULL, 0,
+			SYSCTL_DESCR("lp5523led control"), NULL, 0, NULL, 0,
 			CTL_CREATE, CTL_EOL);
 	if (error)
 		return;
@@ -124,8 +124,8 @@ lp5523_attach(device_t parent, device_t self, void *aux)
 		snprintf(buf, sizeof(buf), "led%u", i);
 		error = sysctl_createv(log, 0, &rnode, &cnode,
 				CTLFLAG_PERMANENT | CTLFLAG_READWRITE,
-				CTLTYPE_INT, buf, "LED enable",
-				lp5523_sysctl, 0, (void *)sc, CTL_CREATE,
+				CTLTYPE_INT, buf, SYSCTL_DESCR("LED enable"),
+				lp5523_sysctl, 0, (void *)sc, 0, CTL_CREATE,
 				CTL_EOL);
 		if (error)
 			break;
