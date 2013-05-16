@@ -83,6 +83,9 @@ static int	lp5523_reset(struct lp5523_softc *);
 
 static int	lp5523_sysctl(SYSCTLFN_ARGS);
 
+static void	lp5523_refresh_temperature(struct sysmon_envsys *,
+		envsys_data_t *);
+
 static int	lp5523_read_1(struct lp5523_softc *, uint8_t, uint8_t *);
 static int	lp5523_write_1(struct lp5523_softc *, uint8_t, uint8_t);
 
@@ -125,13 +128,12 @@ lp5523_attach_envsys(struct lp5523_softc *sc)
 {
 	const int flags = ENVSYS_FMONNOTSUPP | ENVSYS_FHAS_ENTROPY
 		| ENVSYS_FVALID_MIN | ENVSYS_FVALID_MAX;
-	int8_t s8;
 
 	sc->sc_sme = sysmon_envsys_create();
 
 	sc->sc_sme->sme_cookie = sc;
 	sc->sc_sme->sme_name = device_xname(sc->sc_dev);
-	sc->sc_sme->sme_flags = SME_DISABLE_REFRESH;
+	sc->sc_sme->sme_refresh = lp5523_refresh_temperature;
 
 	sc->sc_temp_sensor.flags = flags;
 	sc->sc_temp_sensor.units = ENVSYS_STEMP;
@@ -152,13 +154,7 @@ lp5523_attach_envsys(struct lp5523_softc *sc)
 		return;
 	}
 
-	iic_acquire_bus(sc->sc_i2c, 0);
-	lp5523_read_1(sc, LP5523_REG_TEMP_READ, &s8);
-	iic_release_bus(sc->sc_i2c, 0);
-	if (s8 >= -41 && s8 <= 89) {
-		sc->sc_temp_sensor.state = ENVSYS_SVALID;
-		sc->sc_temp_sensor.value_cur = LP5523_DEGC2UK(s8);
-	}
+	lp5523_refresh_temperature(sc->sc_sme, &sc->sc_temp_sensor);
 }
 
 static void
@@ -236,6 +232,23 @@ lp5523_sysctl(SYSCTLFN_ARGS)
 	iic_release_bus(sc->sc_i2c, 0);
 
 	return error;
+}
+
+static void
+lp5523_refresh_temperature(struct sysmon_envsys *sme, envsys_data_t *edata)
+{
+	struct lp5523_softc *sc = sme->sme_cookie;
+	int8_t s8;
+
+	iic_acquire_bus(sc->sc_i2c, 0);
+	lp5523_read_1(sc, LP5523_REG_TEMP_READ, &s8);
+	iic_release_bus(sc->sc_i2c, 0);
+	if (s8 >= -41 && s8 <= 89) {
+		sc->sc_temp_sensor.state = ENVSYS_SVALID;
+		sc->sc_temp_sensor.value_cur = LP5523_DEGC2UK(s8);
+	} else {
+		sc->sc_temp_sensor.state = ENVSYS_SINVALID;
+	}
 }
 
 static int
