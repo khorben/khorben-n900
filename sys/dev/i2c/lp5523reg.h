@@ -1,4 +1,4 @@
-/* $NetBSD$ */
+/* $NetBSD: lp5523reg.h,v 1.1.2.1 2013/05/16 15:36:50 khorben Exp $ */
 
 /*
  * Texas Instruments LP5523 Programmable 9-Output LED Driver
@@ -35,7 +35,7 @@
 #define _DEV_I2C_LP5523REG_H_
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD$");
+__KERNEL_RCSID(0, "$NetBSD: lp5523reg.h,v 1.1.2.1 2013/05/16 15:36:50 khorben Exp $");
 
 /* registers */
 #define LP5523_REG_ENGINE_CNTRL1		0x00
