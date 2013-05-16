@@ -75,8 +75,8 @@ static int	lp5523_sysctl(SYSCTLFN_ARGS);
 
 #if 0
 static int	lp5523_read_1(struct lp5523_softc *, uint8_t, uint8_t *);
-static int	lp5523_write_1(struct lp5523_softc *, uint8_t, uint8_t);
 #endif
+static int	lp5523_write_1(struct lp5523_softc *, uint8_t, uint8_t);
 
 CFATTACH_DECL_NEW(lp5523led, sizeof(struct lp5523_softc),
 	lp5523_match, lp5523_attach, NULL, NULL);
@@ -140,7 +140,7 @@ lp5523_attach(device_t parent, device_t self, void *aux)
 static int
 lp5523_reset(struct lp5523_softc *sc)
 {
-	/* FIXME implement */
+	lp5523_write_1(sc, LP5523_REG_RESET, 0xff);
 	return 0;
 }
 
@@ -179,6 +179,7 @@ lp5523_read_1(struct lp5523_softc *sc, uint8_t reg, uint8_t *val)
 	return iic_exec(sc->sc_i2c, I2C_OP_READ_WITH_STOP, sc->sc_addr,
 			&reg, sizeof(reg), val, sizeof(*val), 0);
 }
+#endif
 
 static int
 lp5523_write_1(struct lp5523_softc *sc, uint8_t reg, uint8_t val)
@@ -188,4 +189,3 @@ lp5523_write_1(struct lp5523_softc *sc, uint8_t reg, uint8_t val)
 	return iic_exec(sc->sc_i2c, I2C_OP_WRITE_WITH_STOP, sc->sc_addr,
 			NULL, 0, data, sizeof(data), 0);
 }
-#endif
