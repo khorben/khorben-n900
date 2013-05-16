@@ -38,6 +38,8 @@ __KERNEL_RCSID(0, "$NetBSD$");
 #include <sys/device.h>
 #include <sys/sysctl.h>
 
+#include <dev/sysmon/sysmonvar.h>
+
 #include <dev/i2c/i2cvar.h>
 
 #include <dev/i2c/lp5523reg.h>
@@ -64,10 +66,15 @@ struct lp5523_softc {
 	i2c_addr_t		sc_addr;
 
 	struct sysctllog	*sc_sysctllog;
+
+	/* temperature sensor */
+	struct sysmon_envsys	*sc_sme;
+	envsys_data_t		sc_temp_sensor;
 };
 
 static int	lp5523_match(device_t, cfdata_t, void *);
 static void	lp5523_attach(device_t, device_t, void *);
+static void	lp5523_attach_envsys(struct lp5523_softc *);
 static void	lp5523_attach_sysctl(struct lp5523_softc *);
 
 static int	lp5523_reset(struct lp5523_softc *);
@@ -105,9 +112,39 @@ lp5523_attach(device_t parent, device_t self, void *aux)
 
 	lp5523_attach_sysctl(sc);
 
+	lp5523_attach_envsys(sc);
+
 	if (!pmf_device_register(sc->sc_dev, NULL, NULL)) {
 		aprint_error_dev(sc->sc_dev,
 		    "could not establish power handler\n");
+	}
+}
+
+static void
+lp5523_attach_envsys(struct lp5523_softc *sc)
+{
+	const int flags = ENVSYS_FMONNOTSUPP | ENVSYS_FHAS_ENTROPY;
+
+	sc->sc_sme = sysmon_envsys_create();
+
+	sc->sc_sme->sme_cookie = sc;
+	sc->sc_sme->sme_name = device_xname(sc->sc_dev);
+	sc->sc_sme->sme_flags = SME_DISABLE_REFRESH;
+
+	sc->sc_temp_sensor.flags = flags;
+	sc->sc_temp_sensor.units = ENVSYS_STEMP;
+	sc->sc_temp_sensor.state = ENVSYS_SINVALID;
+
+	strlcat(sc->sc_temp_sensor.desc, device_xname(sc->sc_dev),
+			sizeof(sc->sc_temp_sensor.desc));
+
+	if (sysmon_envsys_sensor_attach(sc->sc_sme, &sc->sc_temp_sensor) != 0
+			|| sysmon_envsys_register(sc->sc_sme) != 0)
+	{
+		aprint_error_dev(sc->sc_dev, "unable to attach the temperature"
+				" sensor\n");
+		sysmon_envsys_destroy(sc->sc_sme);
+		sc->sc_sme = NULL;
 	}
 }
 
@@ -127,7 +164,7 @@ lp5523_attach_sysctl(struct lp5523_softc *sc)
 		return;
 
 	error = sysctl_createv(log, 0, &rnode, &rnode, CTLFLAG_PERMANENT,
-			CTLTYPE_NODE, sc->sc_dev->dv_xname,
+			CTLTYPE_NODE, device_xname(sc->sc_dev),
 			SYSCTL_DESCR("lp5523led control"), NULL, 0, NULL, 0,
 			CTL_CREATE, CTL_EOL);
 	if (error)
