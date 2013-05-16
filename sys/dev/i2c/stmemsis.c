@@ -1,8 +1,15 @@
 /* $NetBSD$ */
 
 /*
- * Copyright (c) 2013 Pierre Pronchery <khorben@defora.org>
+ * ST MEMS inertial sensors (accelerometers)
+ * - LIS3LV02DL
+ * - LIS302DL
+ *
+ * Copyright (c) 2013 The NetBSD Foundation, Inc.
  * All rights reserved.
+ *
+ * This code is derived from software contributed to The NetBSD Foundation
+ * by Pierre Pronchery (khorben@defora.org).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,12 +31,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- */
-
-/*
- * ST MEMS inertial sensors (accelerometers)
- * - LIS3LV02DL
- * - LIS302DL
  */
 
 #include <sys/cdefs.h>
