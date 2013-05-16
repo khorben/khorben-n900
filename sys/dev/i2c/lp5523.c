@@ -81,9 +81,7 @@ static int	lp5523_reset(struct lp5523_softc *);
 
 static int	lp5523_sysctl(SYSCTLFN_ARGS);
 
-#if 0
 static int	lp5523_read_1(struct lp5523_softc *, uint8_t, uint8_t *);
-#endif
 static int	lp5523_write_1(struct lp5523_softc *, uint8_t, uint8_t);
 
 CFATTACH_DECL_NEW(lp5523led, sizeof(struct lp5523_softc),
@@ -124,6 +122,7 @@ static void
 lp5523_attach_envsys(struct lp5523_softc *sc)
 {
 	const int flags = ENVSYS_FMONNOTSUPP | ENVSYS_FHAS_ENTROPY;
+	int8_t s8;
 
 	sc->sc_sme = sysmon_envsys_create();
 
@@ -145,6 +144,15 @@ lp5523_attach_envsys(struct lp5523_softc *sc)
 				" sensor\n");
 		sysmon_envsys_destroy(sc->sc_sme);
 		sc->sc_sme = NULL;
+		return;
+	}
+
+	iic_acquire_bus(sc->sc_i2c, 0);
+	lp5523_read_1(sc, LP5523_REG_TEMP_READ, &s8);
+	iic_release_bus(sc->sc_i2c, 0);
+	if (s8 >= -41 && s8 <= 89) {
+		sc->sc_temp_sensor.state = ENVSYS_SVALID;
+		sc->sc_temp_sensor.value_cur = s8;
 	}
 }
 
@@ -225,14 +233,12 @@ lp5523_sysctl(SYSCTLFN_ARGS)
 	return error;
 }
 
-#if 0
 static int
 lp5523_read_1(struct lp5523_softc *sc, uint8_t reg, uint8_t *val)
 {
 	return iic_exec(sc->sc_i2c, I2C_OP_READ_WITH_STOP, sc->sc_addr,
 			&reg, sizeof(reg), val, sizeof(*val), 0);
 }
-#endif
 
 static int
 lp5523_write_1(struct lp5523_softc *sc, uint8_t reg, uint8_t val)
