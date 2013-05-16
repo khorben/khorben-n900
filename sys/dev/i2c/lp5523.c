@@ -121,7 +121,8 @@ lp5523_attach(device_t parent, device_t self, void *aux)
 static void
 lp5523_attach_envsys(struct lp5523_softc *sc)
 {
-	const int flags = ENVSYS_FMONNOTSUPP | ENVSYS_FHAS_ENTROPY;
+	const int flags = ENVSYS_FMONNOTSUPP | ENVSYS_FHAS_ENTROPY
+		| ENVSYS_FVALID_MIN | ENVSYS_FVALID_MAX;
 	int8_t s8;
 
 	sc->sc_sme = sysmon_envsys_create();
@@ -133,8 +134,10 @@ lp5523_attach_envsys(struct lp5523_softc *sc)
 	sc->sc_temp_sensor.flags = flags;
 	sc->sc_temp_sensor.units = ENVSYS_STEMP;
 	sc->sc_temp_sensor.state = ENVSYS_SINVALID;
+	sc->sc_temp_sensor.value_min = -41000;
+	sc->sc_temp_sensor.value_max = 89000;
 
-	strlcat(sc->sc_temp_sensor.desc, device_xname(sc->sc_dev),
+	strlcat(sc->sc_temp_sensor.desc, "temperature",
 			sizeof(sc->sc_temp_sensor.desc));
 
 	if (sysmon_envsys_sensor_attach(sc->sc_sme, &sc->sc_temp_sensor) != 0
@@ -152,7 +155,7 @@ lp5523_attach_envsys(struct lp5523_softc *sc)
 	iic_release_bus(sc->sc_i2c, 0);
 	if (s8 >= -41 && s8 <= 89) {
 		sc->sc_temp_sensor.state = ENVSYS_SVALID;
-		sc->sc_temp_sensor.value_cur = s8;
+		sc->sc_temp_sensor.value_cur = s8 * 1000;
 	}
 }
 
