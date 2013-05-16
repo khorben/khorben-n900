@@ -1,47 +1,45 @@
-/* $NetBSD$ */
+/* $NetBSD: omap2_spi.c,v 1.1.2.5 2013/05/15 23:27:49 khorben Exp $ */
 
 /*
- * Copyright (c) 2013 Pierre Pronchery <khorben@defora.org>
+ * Texas Instruments OMAP2/3 Multichannel SPI driver.
+ *
+ * Copyright (c) 2013 The NetBSD Foundation, Inc.
  * All rights reserved.
+ *
+ * This code is derived from software contributed to The NetBSD Foundation
+ * by Pierre Pronchery (khorben@defora.org).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
- * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD$");
+__KERNEL_RCSID(0, "$NetBSD: omap2_spi.c,v 1.1.2.5 2013/05/15 23:27:49 khorben Exp $");
 
 #include "opt_omap.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
-#if 0
-#include <sys/conf.h>
-#endif
 #include <sys/bus.h>
-#if 0
-#include <sys/proc.h>
-#include <sys/kernel.h>
-#include <sys/mutex.h>
-#endif
 
 #include <dev/spi/spivar.h>
 
@@ -269,6 +267,7 @@ omap2_spi_start(struct omap2_spi_softc * const sc, int channel)
 {
 	struct omap2_spi_channel *chan;
 	struct spi_transfer *st;
+	uint32_t statusval = 0;
 	uint32_t enableval = 0;
 	uint32_t ctrlreg;
 	uint32_t ctrlval;
@@ -290,26 +289,44 @@ omap2_spi_start(struct omap2_spi_softc * const sc, int channel)
 
 	switch (channel) {
 		case 0:
+			statusval = OMAP2_MCSPI_IRQSTATUS_RX0_OVERFLOW
+				| OMAP2_MCSPI_IRQSTATUS_RX0_FULL
+				| OMAP2_MCSPI_IRQSTATUS_TX0_UNDERFLOW
+				| OMAP2_MCSPI_IRQSTATUS_TX0_EMPTY;
 			enableval = OMAP2_MCSPI_IRQENABLE_RX0_FULL
 				| OMAP2_MCSPI_IRQENABLE_TX0_UNDERFLOW
 				| OMAP2_MCSPI_IRQENABLE_TX0_EMPTY;
 			break;
 		case 1:
+			statusval = OMAP2_MCSPI_IRQSTATUS_RX1_FULL
+				| OMAP2_MCSPI_IRQSTATUS_TX1_UNDERFLOW
+				| OMAP2_MCSPI_IRQSTATUS_TX1_EMPTY;
 			enableval = OMAP2_MCSPI_IRQENABLE_RX1_FULL
 				| OMAP2_MCSPI_IRQENABLE_TX1_UNDERFLOW
 				| OMAP2_MCSPI_IRQENABLE_TX1_EMPTY;
 			break;
 		case 2:
+			statusval = OMAP2_MCSPI_IRQSTATUS_RX2_FULL
+				| OMAP2_MCSPI_IRQSTATUS_TX2_UNDERFLOW
+				| OMAP2_MCSPI_IRQSTATUS_TX2_EMPTY;
 			enableval = OMAP2_MCSPI_IRQENABLE_RX2_FULL
 				| OMAP2_MCSPI_IRQENABLE_TX2_UNDERFLOW
 				| OMAP2_MCSPI_IRQENABLE_TX2_EMPTY;
 			break;
 		case 3:
+			statusval = OMAP2_MCSPI_IRQSTATUS_RX3_FULL
+				| OMAP2_MCSPI_IRQSTATUS_TX3_UNDERFLOW
+				| OMAP2_MCSPI_IRQSTATUS_TX3_EMPTY;
 			enableval = OMAP2_MCSPI_IRQENABLE_RX3_FULL
 				| OMAP2_MCSPI_IRQENABLE_TX3_UNDERFLOW
 				| OMAP2_MCSPI_IRQENABLE_TX3_EMPTY;
 			break;
 	}
+
+	/* clear the interrupts for this channel */
+	u32 = SPI_READ_REG(sc, OMAP2_MCSPI_IRQSTATUS);
+	u32 |= statusval;
+	SPI_WRITE_REG(sc, OMAP2_MCSPI_IRQSTATUS, u32);
 
 	/* enable interrupts */
 	u32 = SPI_READ_REG(sc, OMAP2_MCSPI_IRQENABLE);
@@ -331,13 +348,13 @@ omap2_spi_stop(struct omap2_spi_softc * const sc, int channel)
 
 	chan = &sc->sc_channels[channel];
 
-	chan->running = false;
-
 	/* stop the channel */
 	ctrlreg = OMAP2_MCSPI_CHXCTRL(channel);
 	u32 = SPI_READ_REG(sc, ctrlreg);
 	u32 &= ~OMAP2_MCSPI_CHXCTRL_EN;
 	SPI_WRITE_REG(sc, ctrlreg, u32);
+
+	chan->running = false;
 }
 
 static int
@@ -348,51 +365,42 @@ omap2_spi_intr(void *v)
 	struct omap2_spi_channel *chan;
 	struct spi_transfer *st;
 	uint32_t status;
-	uint32_t u32;
 	uint32_t tx_empty = 0;
 	uint32_t rx_full = 0;
 
 	/* reset the channel status bits */
 	status = SPI_READ_REG(sc, OMAP2_MCSPI_IRQSTATUS);
-	u32 = 0;
+
+	/* acknowledge the interrupt */
+	SPI_WRITE_REG(sc, OMAP2_MCSPI_IRQSTATUS, status);
 
 	/* check every channel */
 	for (i = 0; i < sc->sc_spi.sct_nslaves; i++) {
 		chan = &sc->sc_channels[i];
 
+		if (!chan->running)
+			continue;
+
 		switch (i) {
 			case 0:
-				u32 |= OMAP2_MCSPI_IRQSTATUS_RX0_OVERFLOW
-					| OMAP2_MCSPI_IRQSTATUS_RX0_FULL
-					| OMAP2_MCSPI_IRQSTATUS_TX0_UNDERFLOW
-					| OMAP2_MCSPI_IRQSTATUS_TX0_EMPTY;
 				tx_empty = status
 					& OMAP2_MCSPI_IRQSTATUS_TX0_EMPTY;
 				rx_full = status
 					& OMAP2_MCSPI_IRQSTATUS_RX0_FULL;
 				break;
 			case 1:
-				u32 |= OMAP2_MCSPI_IRQSTATUS_RX1_FULL
-					| OMAP2_MCSPI_IRQSTATUS_TX1_UNDERFLOW
-					| OMAP2_MCSPI_IRQSTATUS_TX1_EMPTY;
 				tx_empty = status
 					& OMAP2_MCSPI_IRQSTATUS_TX1_EMPTY;
 				rx_full = status
 					& OMAP2_MCSPI_IRQSTATUS_RX1_FULL;
 				break;
 			case 2:
-				u32 |= OMAP2_MCSPI_IRQSTATUS_RX2_FULL
-					| OMAP2_MCSPI_IRQSTATUS_TX2_UNDERFLOW
-					| OMAP2_MCSPI_IRQSTATUS_TX2_EMPTY;
 				tx_empty = status
 					& OMAP2_MCSPI_IRQSTATUS_TX2_EMPTY;
 				rx_full = status
 					& OMAP2_MCSPI_IRQSTATUS_RX2_FULL;
 				break;
 			case 3:
-				u32 |= OMAP2_MCSPI_IRQSTATUS_RX3_FULL
-					| OMAP2_MCSPI_IRQSTATUS_TX3_UNDERFLOW
-					| OMAP2_MCSPI_IRQSTATUS_TX3_EMPTY;
 				tx_empty = status
 					& OMAP2_MCSPI_IRQSTATUS_TX3_EMPTY;
 				rx_full = status
@@ -400,35 +408,30 @@ omap2_spi_intr(void *v)
 				break;
 		}
 
-		if (chan->wchunk != NULL) {
-			if (tx_empty) {
+		if (tx_empty) {
+			if (chan->wchunk != NULL) {
 				omap2_spi_send(sc, i);
-				if (chan->wchunk == NULL)
-					omap2_spi_recv(sc, i);
 			}
 		}
-		else if (rx_full) {
+		if (rx_full) {
 			omap2_spi_recv(sc, i);
+			omap2_spi_send(sc, i);
 		}
 
-		if (chan->wchunk == NULL && chan->rchunk == NULL) {
+		if (chan->wchunk == NULL && chan->rchunk == NULL)
+		{
 			st = chan->transfer;
 			chan->transfer = NULL;
-
 			KASSERT(st != NULL);
 			spi_done(st, 0);
 
-			spi_transq_dequeue(&chan->queue);
-			if ((st = spi_transq_first(&chan->queue)) == NULL)
-				omap2_spi_stop(sc, i);
-			else
-				chan->transfer = st;
+			/* stop the current transfer */
+			omap2_spi_stop(sc, i);
 
+			/* start a new transfer if any was queued */
+			omap2_spi_start(sc, i);
 		}
 	}
-
-	/* acknowledge the interrupt */
-	SPI_WRITE_REG(sc, OMAP2_MCSPI_IRQSTATUS, u32);
 
 	return 1;
 }
@@ -477,22 +480,23 @@ omap2_spi_send(struct omap2_spi_softc * const sc, int channel)
 	uint32_t u32;
 	uint32_t data;
 
-	if ((chunk = sc->sc_channels[channel].wchunk) == NULL)
-		return;
-
-	if (chunk->chunk_wresid) {
-		u32 = SPI_READ_REG(sc, stat);
-		if ((u32 & OMAP2_MCSPI_CHXSTAT_TXS) == 0)
-			return;
-		if (chunk->chunk_wptr) {
-			data = *chunk->chunk_wptr++;
-			SPI_WRITE_REG(sc, OMAP2_MCSPI_TX(channel), data);
-		}
+	while ((chunk = sc->sc_channels[channel].wchunk) != NULL
+			&& chunk->chunk_wresid == 0) {
+		sc->sc_channels[channel].wchunk = chunk->chunk_next;
 	}
 
+	if (chunk == NULL)
+		return;
+
+	u32 = SPI_READ_REG(sc, stat);
+	if ((u32 & OMAP2_MCSPI_CHXSTAT_TXS) == 0)
+		return;
+	data = (chunk->chunk_wptr != NULL) ? *chunk->chunk_wptr++ : '\0';
+	SPI_WRITE_REG(sc, OMAP2_MCSPI_TX(channel), data);
+
 	if (--chunk->chunk_wresid == 0) {
-		sc->sc_channels[channel].wchunk
-			= sc->sc_channels[channel].wchunk->chunk_next;
+		sc->sc_channels[channel].wchunk = chunk->chunk_next;
+		chunk = sc->sc_channels[channel].wchunk;
 	}
 }
 
@@ -521,7 +525,7 @@ omap2_spi_recv(struct omap2_spi_softc * const sc, int channel)
 	}
 
 	if (--chunk->chunk_rresid == 0) {
-		sc->sc_channels[channel].rchunk
-			= sc->sc_channels[channel].rchunk->chunk_next;
+		sc->sc_channels[channel].rchunk = chunk->chunk_next;
+		chunk = sc->sc_channels[channel].rchunk;
 	}
 }
