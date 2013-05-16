@@ -68,6 +68,7 @@ struct lp5523_softc {
 
 static int	lp5523_match(device_t, cfdata_t, void *);
 static void	lp5523_attach(device_t, device_t, void *);
+static void	lp5523_attach_sysctl(struct lp5523_softc *);
 
 static int	lp5523_reset(struct lp5523_softc *);
 
@@ -92,11 +93,6 @@ lp5523_attach(device_t parent, device_t self, void *aux)
 {
 	struct lp5523_softc *sc = device_private(self);
 	struct i2c_attach_args *ia = aux;
-	struct sysctllog **log = &sc->sc_sysctllog;
-	const struct sysctlnode *rnode, *cnode;
-	unsigned int i;
-	char buf[8];
-	int error;
 
 	sc->sc_dev = self;
 	sc->sc_i2c = ia->ia_tag;
@@ -106,6 +102,23 @@ lp5523_attach(device_t parent, device_t self, void *aux)
 
 	aprint_normal(": LED driver\n");
 	aprint_naive(": LED driver\n");
+
+	lp5523_attach_sysctl(sc);
+
+	if (!pmf_device_register(sc->sc_dev, NULL, NULL)) {
+		aprint_error_dev(sc->sc_dev,
+		    "could not establish power handler\n");
+	}
+}
+
+static void
+lp5523_attach_sysctl(struct lp5523_softc *sc)
+{
+	struct sysctllog **log = &sc->sc_sysctllog;
+	const struct sysctlnode *rnode, *cnode;
+	unsigned int i;
+	char buf[8];
+	int error;
 
 	error = sysctl_createv(log, 0, NULL, &rnode, CTLFLAG_PERMANENT,
 			CTLTYPE_NODE, "hw", NULL, NULL, 0, NULL, 0, CTL_HW,
@@ -130,17 +143,18 @@ lp5523_attach(device_t parent, device_t self, void *aux)
 		if (error)
 			break;
 	}
-
-	if (!pmf_device_register(sc->sc_dev, NULL, NULL)) {
-		aprint_error_dev(sc->sc_dev,
-		    "could not establish power handler\n");
-	}
 }
 
 static int
 lp5523_reset(struct lp5523_softc *sc)
 {
+	uint8_t u8;
+
 	lp5523_write_1(sc, LP5523_REG_RESET, 0xff);
+
+	u8 = LP5523_REG_ENGINE_CNTRL1_CHIP_EN;
+	lp5523_write_1(sc, LP5523_REG_ENGINE_CNTRL1, u8);
+
 	return 0;
 }
 
