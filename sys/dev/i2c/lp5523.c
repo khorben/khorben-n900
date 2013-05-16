@@ -44,6 +44,8 @@ __KERNEL_RCSID(0, "$NetBSD$");
 
 #include <dev/i2c/lp5523reg.h>
 
+#define LP5523_DEGC2UK(t) ((t * 1000000) + 273150000)
+
 /* constants */
 enum lp5523_leds {
 	LP5523_LED_0 = 0,
@@ -134,8 +136,8 @@ lp5523_attach_envsys(struct lp5523_softc *sc)
 	sc->sc_temp_sensor.flags = flags;
 	sc->sc_temp_sensor.units = ENVSYS_STEMP;
 	sc->sc_temp_sensor.state = ENVSYS_SINVALID;
-	sc->sc_temp_sensor.value_min = -41000;
-	sc->sc_temp_sensor.value_max = 89000;
+	sc->sc_temp_sensor.value_min = LP5523_DEGC2UK(-41);
+	sc->sc_temp_sensor.value_max = LP5523_DEGC2UK(89);
 
 	strlcat(sc->sc_temp_sensor.desc, "temperature",
 			sizeof(sc->sc_temp_sensor.desc));
@@ -155,7 +157,7 @@ lp5523_attach_envsys(struct lp5523_softc *sc)
 	iic_release_bus(sc->sc_i2c, 0);
 	if (s8 >= -41 && s8 <= 89) {
 		sc->sc_temp_sensor.state = ENVSYS_SVALID;
-		sc->sc_temp_sensor.value_cur = s8 * 1000;
+		sc->sc_temp_sensor.value_cur = LP5523_DEGC2UK(s8);
 	}
 }
 
