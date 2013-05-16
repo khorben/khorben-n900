@@ -1,4 +1,4 @@
-/* $NetBSD: lp5523.c,v 1.1.2.1 2013/05/16 15:36:50 khorben Exp $ */
+/* $NetBSD: lp5523.c,v 1.1.2.2 2013/05/16 15:51:29 khorben Exp $ */
 
 /*
  * Texas Instruments LP5523 Programmable 9-Output LED Driver
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: lp5523.c,v 1.1.2.1 2013/05/16 15:36:50 khorben Exp $");
+__KERNEL_RCSID(0, "$NetBSD: lp5523.c,v 1.1.2.2 2013/05/16 15:51:29 khorben Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
