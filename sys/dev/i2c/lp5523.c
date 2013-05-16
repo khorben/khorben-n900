@@ -187,10 +187,12 @@ lp5523_reset(struct lp5523_softc *sc)
 {
 	uint8_t u8;
 
+	iic_acquire_bus(sc->sc_i2c, 0);
 	lp5523_write_1(sc, LP5523_REG_RESET, 0xff);
 
 	u8 = LP5523_REG_ENGINE_CNTRL1_CHIP_EN;
 	lp5523_write_1(sc, LP5523_REG_ENGINE_CNTRL1, u8);
+	iic_release_bus(sc->sc_i2c, 0);
 
 	return 0;
 }
