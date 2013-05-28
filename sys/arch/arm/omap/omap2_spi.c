@@ -40,6 +40,7 @@ __KERNEL_RCSID(0, "$NetBSD: omap2_spi.c,v 1.1.2.6 2013/05/16 18:24:26 khorben Ex
 #include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/bus.h>
+#include <sys/kernel.h>
 
 #include <dev/spi/spivar.h>
 
@@ -258,6 +259,7 @@ omap2_spi_start(struct omap2_spi_softc * const sc, int channel)
 	uint32_t ctrlreg;
 	uint32_t ctrlval;
 	uint32_t u32;
+	int s;
 
 	chan = &sc->sc_channels[channel];
 	if (chan->running)
@@ -323,6 +325,17 @@ omap2_spi_start(struct omap2_spi_softc * const sc, int channel)
 	u32 = SPI_READ_REG(sc, ctrlreg);
 	ctrlval = OMAP2_MCSPI_CHXCTRL_EN;
 	SPI_WRITE_REG(sc, ctrlreg, u32 | ctrlval);
+
+	if (!cold)
+		return;
+
+	s = splbio();
+	for (;;) {
+		omap2_spi_intr(sc);
+		if (ISSET(st->st_flags, SPI_F_DONE))
+			break;
+	}
+	splx(s);
 }
 
 static void
@@ -482,7 +495,6 @@ omap2_spi_send(struct omap2_spi_softc * const sc, int channel)
 
 	if (--chunk->chunk_wresid == 0) {
 		sc->sc_channels[channel].wchunk = chunk->chunk_next;
-		chunk = sc->sc_channels[channel].wchunk;
 	}
 }
 
@@ -512,6 +524,5 @@ omap2_spi_recv(struct omap2_spi_softc * const sc, int channel)
 
 	if (--chunk->chunk_rresid == 0) {
 		sc->sc_channels[channel].rchunk = chunk->chunk_next;
-		chunk = sc->sc_channels[channel].rchunk;
 	}
 }
